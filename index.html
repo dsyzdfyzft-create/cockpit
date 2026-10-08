@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cockpit">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EEF3F6">
+<title>Cockpit d'entraînement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* Palette inspirée d'un bassin : eau claire, lignes d'eau, encre marine */
+  :root {
+    --fond: #EEF3F6;
+    --surface: #FFFFFF;
+    --encre: #14213D;
+    --doux: #5B6B82;
+    --ligne: #D6E0E8;
+    --vert: #2E9E5B;
+    --jaune: #D9A300;
+    --rouge: #D7263D;
+    --natation: #1C9AA6;
+    --velo: #2F5DA8;
+    --course: #E2711D;
+    --autre: #8A94A6;
+    --ctl: #14213D;
+    --atl: #D7263D;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #0E1828;
+      --surface: #15233A;
+      --encre: #E6EDF5;
+      --doux: #9AABC2;
+      --ligne: #24364F;
+      --ctl: #CFE0F2;
+      --velo: #6E95DB;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--fond);
+    color: var(--encre);
+    font: 400 16px/1.5 "Barlow", system-ui, -apple-system, sans-serif;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  h1, h2, .chiffre, .titre-jour {
+    font-family: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+    letter-spacing: 0.01em;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 16px 16px 48px; }
+  a { color: inherit; }
+  button {
+    font: 500 15px/1 "Barlow", system-ui, sans-serif;
+    color: var(--encre);
+    background: var(--surface);
+    border: 1px solid var(--ligne);
+    border-radius: 999px;
+    padding: 10px 16px;
+    cursor: pointer;
+  }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--velo); outline-offset: 2px; }
+  .discret { color: var(--doux); }
+
+  /* En-tête : objectif et compte à rebours */
+  .haut { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0 4px; }
+  .haut h1 { font-size: 1.25rem; font-weight: 600; margin: 0; }
+  .compte { text-align: right; font-size: 0.95rem; color: var(--doux); }
+  .compte strong { font-family: "Barlow Condensed", sans-serif; font-size: 1.5rem; color: var(--encre); font-weight: 700; }
+
+  /* La décision du jour : l'élément principal de la page */
+  .jour {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: center;
+    padding: 20px 0 24px;
+    border-bottom: 2px solid var(--encre);
+  }
+  .anneau { width: 132px; height: 132px; }
+  .titre-jour { font-size: clamp(2rem, 6.5vw, 3.4rem); line-height: 1.02; font-weight: 700; margin: 0 0 8px; }
+  .prevu { margin: 0; font-size: 1.05rem; max-width: 60ch; }
+  .prevu b { font-weight: 600; }
+  .alerte { color: var(--rouge); font-weight: 600; margin: 0 0 6px; }
+  .stats { display: flex; flex-wrap: wrap; row-gap: 12px; margin: 18px 0 0; padding: 0; list-style: none; grid-column: 1 / -1; }
+  .stats li { padding: 0 18px; border-left: 1px solid var(--ligne); }
+  .stats li:first-child { padding-left: 0; border-left: 0; }
+  .stats .chiffre { display: block; font-size: 1.7rem; font-weight: 600; line-height: 1.1; }
+  .stats .lib { font-size: 0.85rem; color: var(--doux); }
+
+  /* Sommaire */
+  .sommaire { display: flex; gap: 8px; overflow-x: auto; padding: 14px 0; scrollbar-width: none; position: sticky; top: 0; background: var(--fond); z-index: 2; }
+  .sommaire a { text-decoration: none; white-space: nowrap; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--ligne); font-size: 0.92rem; }
+
+  /* Sections */
+  .grille { display: grid; grid-template-columns: 1fr; gap: 28px; }
+  @media (min-width: 900px) { .grille { grid-template-columns: 1fr 1fr; } .large { grid-column: 1 / -1; } }
+  section.bloc { background: var(--surface); border-radius: 14px; padding: 18px 18px 16px; border: 1px solid var(--ligne); scroll-margin-top: 64px; }
+  section.bloc h2 { font-size: 1.55rem; font-weight: 700; margin: 0 0 2px; }
+  .explic { margin: 0 0 12px; color: var(--doux); font-size: 0.95rem; max-width: 70ch; }
+  .graph { position: relative; height: 240px; }
+  .large .graph { height: 280px; }
+
+  /* Tableaux et listes */
+  table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+  th { text-align: left; font-weight: 500; color: var(--doux); padding: 6px 8px; border-bottom: 1px solid var(--ligne); white-space: nowrap; }
+  td { padding: 8px; border-bottom: 1px solid var(--ligne); white-space: nowrap; }
+  td.nom { white-space: normal; min-width: 140px; }
+  .defile { overflow-x: auto; }
+  .pastille { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .records { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 14px; }
+  .records div { padding: 4px 12px; border-left: 1px solid var(--ligne); }
+  .records div:first-child { border-left: 0; padding-left: 0; }
+  .records .chiffre { font-size: 1.7rem; font-weight: 600; display: block; line-height: 1.1; }
+  .plan { list-style: none; margin: 0; padding: 0; }
+  .plan li { display: grid; grid-template-columns: 74px 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--ligne); align-items: baseline; }
+  .plan li:last-child { border-bottom: 0; }
+  .plan .date { color: var(--doux); font-size: 0.9rem; }
+  .plan .desc { color: var(--doux); font-size: 0.88rem; display: block; white-space: pre-line; }
+
+  /* Clé d'accès et états */
+  .cle { max-width: 420px; margin: 12vh auto 0; }
+  .cle h2 { font-family: "Barlow Condensed", sans-serif; font-size: 2rem; margin: 0 0 8px; }
+  .cle input { width: 100%; font: inherit; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--ligne); background: var(--surface); color: var(--encre); margin: 12px 0; }
+  .etat { padding: 40px 0; color: var(--doux); }
+  .pied { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 28px; color: var(--doux); font-size: 0.9rem; }
+  .pied div { display: flex; gap: 8px; }
+
+  @media (max-width: 520px) {
+    .jour { grid-template-columns: 1fr; }
+    .anneau { width: 112px; height: 112px; }
+    .stats li { padding: 0 12px; }
+    .stats .chiffre { font-size: 1.45rem; }
+    .records { grid-template-columns: repeat(2, 1fr); row-gap: 12px; }
+    .records div:nth-child(3) { border-left: 0; padding-left: 0; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .anneau .arc { transition: stroke-dashoffset 900ms cubic-bezier(.2,.7,.2,1); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="haut">
+    <h1>Cockpit d'entraînement</h1>
+    <div class="compte" id="compte"></div>
+  </header>
+
+  <section class="cle" id="cle" hidden>
+    <h2>Ta clé d'accès</h2>
+    <p class="discret" id="cle-message">Saisis la clé du tableau de bord (DASHBOARD_KEY). Elle reste enregistrée sur cet appareil.</p>
+    <form id="cle-form">
+      <input id="cle-input" type="password" autocomplete="off" placeholder="Clé du tableau de bord" required>
+      <button type="submit">Enregistrer la clé</button>
+    </form>
+  </section>
+
+  <p class="etat" id="etat">Chargement de tes données…</p>
+
+  <div id="contenu" hidden>
+    <section class="jour" id="jour"></section>
+
+    <nav class="sommaire" aria-label="Sections">
+      <a href="#s-charge">Charge</a>
+      <a href="#s-recup">Récupération</a>
+      <a href="#s-sommeil">Sommeil</a>
+      <a href="#s-sports">Répartition</a>
+      <a href="#s-seances">Séances</a>
+      <a href="#s-records">Records et FTP</a>
+      <a href="#s-plan">Plan</a>
+    </nav>
+
+    <div class="grille">
+      <section class="bloc large" id="s-charge">
+        <h2>Charge d'entraînement</h2>
+        <p class="explic">Forme de fond (CTL) et fatigue (ATL) sur 90 jours. Les barres montrent ta fraîcheur (TSB) : au-dessus de zéro tu es reposé, très en dessous tu accumules de la fatigue.</p>
+        <div class="graph"><canvas id="g-charge"></canvas></div>
+      </section>
+
+      <section class="bloc" id="s-recup">
+        <h2>Récupération</h2>
+        <p class="explic">Recovery de chaque matin (barres) et HRV de la nuit (ligne), sur 30 jours.</p>
+        <div class="graph"><canvas id="g-recup"></canvas></div>
+      </section>
+
+      <section class="bloc">
+        <h2>FC de repos</h2>
+        <p class="explic">Une FC de repos qui grimpe de plusieurs battements au-dessus de ta moyenne signale souvent fatigue ou maladie.</p>
+        <div class="graph"><canvas id="g-fc"></canvas></div>
+      </section>
+
+      <section class="bloc" id="s-sommeil">
+        <h2>Sommeil</h2>
+        <p class="explic">Sommeil réel (barres) face à ton besoin calculé (ligne), sur 30 jours.</p>
+        <div class="graph"><canvas id="g-sommeil"></canvas></div>
+      </section>
+
+      <section class="bloc" id="s-sports">
+        <h2>Répartition</h2>
+        <p class="explic">Heures de natation, vélo et course par semaine, sur 8 semaines.</p>
+        <div class="graph"><canvas id="g-sports"></canvas></div>
+      </section>
+
+      <section class="bloc large" id="s-seances">
+        <h2>Dernières séances</h2>
+        <p class="explic">Chiffres d'Intervals.icu. La puissance moyenne et la puissance normalisée (NP) sont deux valeurs distinctes ; l'IF et l'EF sont calculés sur la NP.</p>
+        <div class="defile"><table id="t-seances"></table></div>
+      </section>
+
+      <section class="bloc" id="s-records">
+        <h2>Records et FTP</h2>
+        <p class="explic">Tes meilleures puissances à vélo depuis janvier, et l'eFTP estimée sur tes séances récentes.</p>
+        <div class="records" id="records"></div>
+        <div class="graph" style="height:180px"><canvas id="g-eftp"></canvas></div>
+      </section>
+
+      <section class="bloc" id="s-plan">
+        <h2>Plan des 14 prochains jours</h2>
+        <p class="explic">Séances prévues dans ton calendrier Intervals.icu.</p>
+        <ul class="plan" id="plan"></ul>
+      </section>
+    </div>
+
+    <footer class="pied">
+      <span id="maj"></span>
+      <div>
+        <button type="button" id="b-actualiser">Actualiser</button>
+        <button type="button" id="b-cle">Changer de clé</button>
+      </div>
+    </footer>
+  </div>
+</main>
+
+<script>
+// Adresse de ta fonction Supabase (ce n'est pas un secret : sans la clé, elle refuse tout)
+const API = "https://ueaszqiubdcujdzmdlfh.supabase.co/functions/v1/dashboard-data";
+const CLE = "cle-dashboard";
+
+const $ = (s) => document.querySelector(s);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const jj = (iso) => new Date(String(iso).slice(0, 10) + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+const jour = (iso) => new Date(String(iso).slice(0, 10) + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+const hm = (min) => (min == null ? "–" : `${Math.floor(min / 60)} h ${String(Math.round(min) % 60).padStart(2, "0")}`);
+const val = (x, suffixe = "") => (x == null ? "–" : `${x}${suffixe}`);
+const couleurRec = (r) => (r >= 67 ? css("--vert") : r >= 34 ? css("--jaune") : css("--rouge"));
+const famille = (s) => (s.includes("Swim") ? "Natation" : s.includes("Ride") ? "Vélo" : s.includes("Run") ? "Course" : "Autre");
+const couleurSport = (f) => css({ Natation: "--natation", "Vélo": "--velo", Course: "--course", Autre: "--autre" }[f]);
+const graphiques = {};
+
+function etat(texte) {
+  $("#etat").textContent = texte;
+  $("#etat").hidden = !texte;
+}
+
+function demanderCle(message) {
+  $("#contenu").hidden = true;
+  etat("");
+  $("#cle").hidden = false;
+  if (message) $("#cle-message").textContent = message;
+  $("#cle-input").focus();
+}
+
+$("#cle-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  localStorage.setItem(CLE, $("#cle-input").value.trim());
+  $("#cle").hidden = true;
+  charger();
+});
+$("#b-actualiser").addEventListener("click", () => charger());
+$("#b-cle").addEventListener("click", () => { localStorage.removeItem(CLE); demanderCle(); });
+
+async function charger() {
+  const cle = localStorage.getItem(CLE);
+  if (!cle) return demanderCle();
+  etat("Chargement de tes données…");
+  try {
+    const r = await fetch(API, { headers: { "x-key": cle }, cache: "no-store" });
+    if (r.status === 403) {
+      localStorage.removeItem(CLE);
+      return demanderCle("Clé refusée. Vérifie la clé du tableau de bord, puis enregistre-la de nouveau.");
+    }
+    if (!r.ok) throw new Error(String(r.status));
+    afficher(await r.json());
+  } catch {
+    etat("Impossible de joindre ton serveur Supabase. Vérifie ta connexion, puis touche Actualiser.");
+  }
+}
+
+// Anneau de Recovery
+function anneau(r) {
+  const R = 54, C = 2 * Math.PI * R, pct = Math.max(0, Math.min(100, r ?? 0)) / 100;
+  return `<svg class="anneau" viewBox="0 0 132 132" role="img" aria-label="Recovery ${r ?? "inconnue"} %">
+    <circle cx="66" cy="66" r="${R}" fill="none" stroke="${css("--ligne")}" stroke-width="12"/>
+    <circle class="arc" cx="66" cy="66" r="${R}" fill="none" stroke="${couleurRec(r ?? 0)}" stroke-width="12"
+      stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" transform="rotate(-90 66 66)"
+      data-cible="${C * (1 - pct)}"/>
+    <text x="66" y="72" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-size="36" font-weight="700" fill="${css("--encre")}">${r ?? "–"}<tspan font-size="18">%</tspan></text>
+    <text x="66" y="94" text-anchor="middle" font-family="Barlow, sans-serif" font-size="12" fill="${css("--doux")}">Recovery</text>
+  </svg>`;
+}
+
+function afficherJour(d) {
+  const s = d.aujourdhui;
+  const zone = $("#jour");
+  if (!s) {
+    zone.innerHTML = `<p class="prevu">Aucun rapport pour l'instant. Il apparaîtra après ta prochaine nuit enregistrée.</p>`;
+    return;
+  }
+  const titre = s.alert ? "Journée facile conseillée"
+    : s.recovery >= 67 ? "Feu vert pour une séance intense"
+    : s.recovery >= 34 ? "Séance modérée aujourd'hui"
+    : "Journée de récupération";
+  const prevus = d.prevu_aujourdhui ?? [];
+  const prevuTxt = prevus.length
+    ? `Prévu : <b>${prevus.map((p) => esc(p.nom) + (p.duree_min ? ` (${hm(p.duree_min)})` : "")).join(" + ")}</b>, ${esc(s.conseil)}.`
+    : `Rien de prévu dans Intervals. Cible du jour : ${esc(s.cible)}.`;
+  zone.innerHTML = `
+    ${anneau(s.recovery)}
+    <div>
+      ${s.alert ? `<p class="alerte">Signaux inhabituels deux nuits de suite (FC de repos, HRV)</p>` : ""}
+      <p class="titre-jour">${titre}</p>
+      <p class="prevu">${prevuTxt}</p>
+      ${s.est_aujourdhui ? "" : `<p class="discret">Dernier rapport : ${jour(s.date)}</p>`}
+    </div>
+    <ul class="stats">
+      <li><span class="chiffre">${val(s.sleep_perf, " %")}</span><span class="lib">Sommeil (${hm(s.dormi_min)} sur ${hm(s.sleep_need_min)})</span></li>
+      <li><span class="chiffre">${val(s.strain)}</span><span class="lib">Strain d'hier</span></li>
+      <li><span class="chiffre">${val(s.bedtime)}</span><span class="lib">Coucher conseillé</span></li>
+      <li><span class="chiffre">${val(s.regularite, " %")}</span><span class="lib">Régularité du sommeil</span></li>
+      <li><span class="chiffre">${val(s.acwr)}</span><span class="lib">Ratio de charge</span></li>
+      <li><span class="chiffre">${val(s.hrv_ms)}</span><span class="lib">HRV (ms)</span></li>
+      <li><span class="chiffre">${val(s.rhr_bpm)}</span><span class="lib">FC de repos</span></li>
+    </ul>`;
+  // Animation unique de l'anneau au chargement
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const arc = zone.querySelector(".arc");
+    if (arc) arc.style.strokeDashoffset = arc.dataset.cible;
+  }));
+}
+
+function afficherCompte(o) {
+  if (!o?.date) return;
+  const j = Math.ceil((new Date(o.date + "T08:00:00") - new Date()) / 864e5);
+  $("#compte").innerHTML = j >= 0
+    ? `${esc(o.nom)} dans <strong>${j}</strong> jours`
+    : `${esc(o.nom)} : terminé`;
+}
+
+// Graphiques Chart.js
+function graph(id, config) {
+  graphiques[id]?.destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx || typeof Chart === "undefined") return;
+  Chart.defaults.font.family = "Barlow, system-ui, sans-serif";
+  Chart.defaults.color = css("--doux");
+  Chart.defaults.borderColor = css("--ligne");
+  config.options = Object.assign({
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: { legend: { labels: { boxWidth: 12, usePointStyle: true } } },
+  }, config.options || {});
+  graphiques[id] = new Chart(ctx, config);
+}
+
+function afficherCharge(charge) {
+  graph("g-charge", {
+    type: "bar",
+    data: {
+      labels: charge.map((c) => jj(c.date)),
+      datasets: [
+        { type: "line", label: "Forme (CTL)", data: charge.map((c) => c.ctl), borderColor: css("--ctl"), backgroundColor: css("--ctl"), pointRadius: 0, borderWidth: 2.5, tension: 0.3, yAxisID: "y" },
+        { type: "line", label: "Fatigue (ATL)", data: charge.map((c) => c.atl), borderColor: css("--atl"), backgroundColor: css("--atl"), pointRadius: 0, borderWidth: 1.5, tension: 0.3, yAxisID: "y" },
+        { label: "Fraîcheur (TSB)", data: charge.map((c) => c.tsb), backgroundColor: charge.map((c) => (c.tsb ?? 0) >= 0 ? css("--natation") + "99" : css("--rouge") + "55"), yAxisID: "y1", barPercentage: 1, categoryPercentage: 1 },
+      ],
+    },
+    options: {
+      scales: {
+        x: { ticks: { maxTicksLimit: 8 }, grid: { display: false } },
+        y: { position: "left", title: { display: true, text: "CTL / ATL" } },
+        y1: { position: "right", grid: { display: false }, title: { display: true, text: "TSB" } },
+      },
+    },
+  });
+}
+
+function afficherRecup(scores, nuits) {
+  const s30 = scores.slice(-30);
+  const hrv = new Map(nuits.map((n) => [n.date, n.hrv_ms]));
+  graph("g-recup", {
+    type: "bar",
+    data: {
+      labels: s30.map((s) => jj(s.date)),
+      datasets: [
+        { label: "Recovery (%)", data: s30.map((s) => s.recovery), backgroundColor: s30.map((s) => couleurRec(s.recovery) + "CC"), yAxisID: "y", borderRadius: 4 },
+        { type: "line", label: "HRV (ms)", data: s30.map((s) => hrv.get(s.date) ?? null), borderColor: css("--velo"), backgroundColor: css("--velo"), spanGaps: true, pointRadius: 2, tension: 0.3, yAxisID: "y1" },
+      ],
+    },
+    options: {
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+        y: { min: 0, max: 100 },
+        y1: { position: "right", grid: { display: false } },
+      },
+    },
+  });
+
+  const n30 = nuits.slice(-30).filter((n) => n.rhr_bpm != null);
+  const moy = n30.length ? n30.reduce((t, n) => t + Number(n.rhr_bpm), 0) / n30.length : null;
+  graph("g-fc", {
+    type: "line",
+    data: {
+      labels: n30.map((n) => jj(n.date)),
+      datasets: [
+        { label: "FC de repos", data: n30.map((n) => n.rhr_bpm), borderColor: css("--rouge"), backgroundColor: css("--rouge"), pointRadius: 2, tension: 0.3 },
+        { label: "Moyenne", data: n30.map(() => (moy ? Math.round(moy * 10) / 10 : null)), borderColor: css("--doux"), borderDash: [6, 4], pointRadius: 0 },
+      ],
+    },
+    options: { scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } } } },
+  });
+}
+
+function afficherSommeil(scores, nuits) {
+  const besoin = new Map(scores.map((s) => [s.date, s.sleep_need_min]));
+  const n30 = nuits.slice(-30);
+  graph("g-sommeil", {
+    type: "bar",
+    data: {
+      labels: n30.map((n) => jj(n.date)),
+      datasets: [
+        { label: "Dormi (h)", data: n30.map((n) => (n.asleep_min != null ? Math.round(n.asleep_min / 6) / 10 : null)), backgroundColor: css("--velo") + "B3", borderRadius: 4 },
+        { type: "line", label: "Besoin (h)", data: n30.map((n) => (besoin.has(n.date) ? Math.round(besoin.get(n.date) / 6) / 10 : null)), borderColor: css("--encre"), backgroundColor: css("--encre"), pointRadius: 0, stepped: true, spanGaps: true },
+      ],
+    },
+    options: { scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { min: 0 } } },
+  });
+}
+
+function afficherSports(seances) {
+  // Lundi de la semaine d'une date
+  const lundi = (iso) => {
+    const d = new Date(iso);
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  };
+  const semaines = [];
+  const debut = new Date(lundi(new Date().toISOString()) + "T12:00:00");
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date(debut);
+    d.setDate(d.getDate() - 7 * i);
+    semaines.push(d.toISOString().slice(0, 10));
+  }
+  const familles = ["Natation", "Vélo", "Course", "Autre"];
+  const heures = Object.fromEntries(familles.map((f) => [f, semaines.map(() => 0)]));
+  for (const s of seances) {
+    const i = semaines.indexOf(lundi(s.start_date));
+    if (i >= 0) heures[famille(String(s.sport ?? ""))][i] += (s.duration_s ?? 0) / 3600;
+  }
+  graph("g-sports", {
+    type: "bar",
+    data: {
+      labels: semaines.map((w) => `sem. ${jj(w)}`),
+      datasets: familles
+        .filter((f) => f !== "Autre" || heures.Autre.some((h) => h > 0))
+        .map((f) => ({ label: f, data: heures[f].map((h) => Math.round(h * 10) / 10), backgroundColor: couleurSport(f), borderRadius: 3 })),
+    },
+    options: { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, title: { display: true, text: "heures" } } } },
+  });
+}
+
+function afficherSeances(liste) {
+  const lignes = liste.slice(0, 15).map((a) => {
+    const f = famille(a.sport);
+    return `<tr>
+      <td>${jj(a.date)}</td>
+      <td class="nom"><span class="pastille" style="background:${couleurSport(f)}"></span>${esc(a.nom)}</td>
+      <td>${hm(a.duree_min)}</td>
+      <td>${val(a.tss)}</td>
+      <td>${val(a.if)}</td>
+      <td>${a.puissance_moyenne_w != null ? `${a.puissance_moyenne_w} / ${val(a.puissance_np_w)}` : "–"}</td>
+      <td>${val(a.fc_moyenne)}</td>
+      <td>${val(a.ef)}</td>
+      <td>${a.decouplage != null ? a.decouplage + " %" : "–"}</td>
+    </tr>`;
+  }).join("");
+  $("#t-seances").innerHTML = `<thead><tr>
+      <th>Date</th><th>Séance</th><th>Durée</th><th>TSS</th><th>IF</th><th>Moy. / NP (W)</th><th>FC</th><th>EF</th><th>Découplage</th>
+    </tr></thead><tbody>${lignes || `<tr><td colspan="9" class="discret">Aucune séance sur les 6 dernières semaines.</td></tr>`}</tbody>`;
+}
+
+function afficherRecords(records, ftp) {
+  const libelle = { 5: "5 s", 60: "1 min", 300: "5 min", 1200: "20 min" };
+  $("#records").innerHTML = [5, 60, 300, 1200].map((d) => {
+    const r = records.find((x) => x.duration_s === d);
+    return `<div><span class="chiffre">${r ? r.watts + " W" : "–"}</span><span class="discret">${libelle[d]}${r ? `, le ${jj(r.date)}` : ""}</span></div>`;
+  }).join("");
+  const e = (ftp?.eftp_recentes ?? []).slice().reverse();
+  graph("g-eftp", {
+    type: "line",
+    data: {
+      labels: e.map((x) => jj(x.date)),
+      datasets: [
+        { label: "eFTP de la séance (W)", data: e.map((x) => x.eftp), borderColor: css("--velo"), backgroundColor: css("--velo"), pointRadius: 3, tension: 0.2 },
+        { label: "FTP réglée", data: e.map(() => ftp?.reglee ?? null), borderColor: css("--doux"), borderDash: [6, 4], pointRadius: 0 },
+      ],
+    },
+    options: { scales: { x: { grid: { display: false } } } },
+  });
+}
+
+function afficherPlan(plan) {
+  $("#plan").innerHTML = plan.length
+    ? plan.map((p) => {
+        const f = famille(p.sport);
+        return `<li>
+          <span class="date">${jour(p.date)}</span>
+          <span><span class="pastille" style="background:${couleurSport(f)}"></span>${esc(p.nom)}${p.description ? `<span class="desc">${esc(p.description)}</span>` : ""}</span>
+          <span class="discret">${p.duree_min ? hm(p.duree_min) : ""}${p.charge ? `, TSS ${p.charge}` : ""}</span>
+        </li>`;
+      }).join("")
+    : `<li><span></span><span class="discret">Aucune séance prévue. Planifie-les dans Intervals.icu pour les voir ici.</span><span></span></li>`;
+}
+
+function afficher(d) {
+  etat("");
+  $("#cle").hidden = true;
+  $("#contenu").hidden = false;
+  afficherCompte(d.objectif);
+  afficherJour(d);
+  afficherCharge(d.charge ?? []);
+  afficherRecup(d.scores ?? [], d.nuits ?? []);
+  afficherSommeil(d.scores ?? [], d.nuits ?? []);
+  afficherSports(d.seances ?? []);
+  afficherSeances(d.seances_icu ?? []);
+  afficherRecords(d.records ?? [], d.ftp);
+  afficherPlan(d.plan ?? []);
+  $("#maj").textContent = `Mis à jour à ${new Date(d.genere_le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+// Recharge quand on revient sur l'app après un moment
+let dernierChargement = 0;
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && Date.now() - dernierChargement > 10 * 60 * 1000) {
+    dernierChargement = Date.now();
+    charger();
+  }
+});
+dernierChargement = Date.now();
+charger();
+</script>
+</body>
+</html>
