@@ -4207,7 +4207,9 @@ function rendreDurabilite() {
   const sorties = (R.fatigue || []).filter((c) => c.watts?.[i20] > 0 && D.diff(S.today, c.date) < 90);
   if (a20.pct == null) {
     el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">20 MIN FRAIS</span><b>${a20.f ? nf(a20.f) + " W" : "–"}</b><small>90 derniers jours</small></div><div><span class="mono-lab">APRÈS ${esc(kj.toUpperCase())}</span><b>–</b><small>aucune mesure</small></div><div><span class="mono-lab">CONSERVÉ</span><b>–</b><small>&nbsp;</small></div></div>
-      ${xtVerdict(`Aucune sortie des 90 derniers jours ne contient 20 min d'effort soutenu <b>après ${esc(kj)}</b>. Pour mesurer ta durabilité, termine une sortie longue par un bloc de 20 min au seuil.`)}`;
+      ${xtVerdict(R.apres_kj
+        ? `Aucune sortie des 90 derniers jours ne contient 20 min d'effort soutenu <b>après ${esc(kj)}</b>. Pour mesurer ta durabilité, termine une sortie longue par un bloc de 20 min au seuil.`
+        : `Intervals.icu ne renvoie pas encore de puissance « après fatigue » : le seuil de kJ n'est pas réglé. Dans Intervals.icu, ouvre les réglages de ton sport Vélo et renseigne le premier seuil des courbes de puissance fatiguées (1 000 kJ est un bon départ). La carte se remplira au chargement suivant.`, "att")}`;
     return;
   }
   const ton = a20.pct >= 95 ? "" : a20.pct >= 90 ? "" : "att";
