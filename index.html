@@ -1339,7 +1339,7 @@ function rendreEquilibre() {
   el.innerHTML = `
     <div class="c-tete"><span class="mono-lab">ÉQUILIBRE DE CHARGE</span><span class="mono-lab" style="color:${coul}">● ${I.acwr == null ? "–" : ok ? "OK" : I.acwr < 0.8 ? "SOUS-CHARGE" : "PRUDENCE"}</span></div>
     <div class="grand mono" style="color:${coul}">${nf(I.acwr, 2)}<small> ratio · ACWR</small></div>
-    <p class="muted petit">0,8 à 1,3 = sûr · 7 derniers jours face aux 28</p>
+    <p class="muted petit">7 derniers jours face aux 28 · repère habituel 0,8 à 1,3 · décrit la tendance, ne prédit pas les blessures</p>
     <div class="duo sep">
       <div><span class="mono-lab">MONOTONIE</span><b class="mono">${nf(I.monotonie, 2)}</b></div>
       <div><span class="mono-lab">STRAIN HEBDO · FOSTER</span><b class="mono">${nf(I.strainFoster)}</b></div>
@@ -4027,7 +4027,8 @@ const xtVerdict = (txt, ton) => `<p class="xt-verdict ${ton || ""}">${txt}</p>`;
     sv.innerHTML = carte("c-jauge", "Prêt pour Molveno", '<span class="muted petit">5 piliers de la course</span>')
       + g2(carte("c-rpe", "Charge ressentie"), carte("c-brick", "Coût de l'enchaînement vélo → course"))
       + g2(carte("c-dplus", "Dénivelé et terrain"), carte("c-chaleur", "Chaleur et efficacité"))
-      + carte("c-durab", "Durabilité à vélo", '<span class="muted petit">puissance gardée après une grosse dépense</span>');
+      + g2(carte("c-durab", "Durabilité à vélo"), carte("c-anaero", "Capacité anaérobie"))
+      + g2(carte("c-renfo", "Renforcement musculaire"), carte("c-dfa", "Seuil aérobie (HRV à l'effort)"));
     const apres = $(".sous-vue[data-sv='jour']", parentSv) || $(".sous-vue[data-sv='charge']", parentSv);
     (apres || ongletsAnalyse).after(sv);
   }
@@ -4179,6 +4180,7 @@ function rendreBrick() {
   el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">APRÈS VÉLO</span><b>${mmss(allB)}/km</b><small>${B.length} enchaînements</small></div><div><span class="mono-lab">COURSE SEULE</span><b>${mmss(allF)}/km</b><small>${F.length} courses</small></div><div><span class="mono-lab">COÛT</span><b class="${perte > 15 ? "xt-att" : ""}">${perte >= 0 ? "+" : ""}${perte} s/km</b><small>à ${Math.round(fcRef)} bpm</small></div></div>
     <div class="g" style="height:${MOBILE ? 180 : 200}px"><canvas id="g-brick"></canvas></div>
     ${xtVerdict(`À fréquence cardiaque égale, tu cours <b>${Math.abs(perte)} s/km ${perte >= 0 ? "moins vite" : "plus vite"}</b> après le vélo.${tend}`, perte > 20 ? "att" : "")}
+    ${brickKj(B, fcRef)}
     <p class="muted petit">Efficacité = vitesse ÷ FC moyenne, sur les 6 dernières courses de chaque type. Enchaînement : départ moins de 45 min après la fin réelle d'un vélo (arrêts compris), le même jour.</p>`;
   const pt = (r) => ({ x: D.parse(r.a.date).getTime(), y: Math.round(r.ef * 100) / 100 });
   graph("g-brick", { type: "scatter",
@@ -4225,6 +4227,101 @@ function rendreDurabilite() {
     ] },
     options: { interaction: { mode: "nearest", intersect: true }, scales: { x: { type: "linear", ticks: { callback: (v) => D.court(new Date(v).toISOString()), maxTicksLimit: 5 } }, y: { title: { display: !MOBILE, text: "W sur 20 min" } } } },
   });
+}
+
+// ---------- 2 ter. Enchaînement : effet de la dépense à vélo, et dépense prévue le jour de la course ----------
+function veloAvant(run) {
+  const deb = minutesDe(run.heure); if (deb == null) return null;
+  return S.acts.find((a) => {
+    if (a.date !== run.date || fam(a.sport) !== "Ride" || !a.heure || !a.duree_s) return false;
+    const ecart = deb - (minutesDe(a.heure) + (a.duree_ecoulee_s || a.duree_s) / 60);
+    return ecart >= -5 && ecart <= 45;
+  }) || null;
+}
+const kjDe = (a) => (a?.kj > 0 ? a.kj : a?.pmoy && a?.duree_s ? Math.round((a.pmoy * a.duree_s) / 1000) : null);
+function brickKj(B, fcRef) {
+  const L = B.map((r) => ({ ef: r.ef, kj: kjDe(veloAvant(r.a)) })).filter((x) => x.kj > 0);
+  if (L.length < 4) return `<p class="muted petit">Effet de la dépense à vélo : il faut au moins 4 enchaînements dont le vélo a un capteur de puissance (${L.length} pour l'instant).</p>`;
+  const tri = L.map((x) => x.kj).sort((a, b) => a - b), med = tri[Math.floor(tri.length / 2)];
+  const gros = L.filter((x) => x.kj >= med), leger = L.filter((x) => x.kj < med);
+  if (!gros.length || !leger.length) return "";
+  const all = (G) => 1000 / ((moy(G.map((x) => x.ef)) * fcRef) / 60);
+  const ecart = Math.round(all(gros) - all(leger));
+  return xtVerdict(`Après un vélo de <b>${nf(med)} kJ ou plus</b>, tu cours à <b>${mmss(all(gros))}/km</b> ; après un vélo plus léger, à <b>${mmss(all(leger))}/km</b> (à ${Math.round(fcRef)} bpm). ${ecart > 5 ? `Un gros vélo te coûte environ <b>${ecart} s/km</b> à pied.` : "La dépense à vélo ne ralentit pas ta course : bon signe."}`, ecart > 15 ? "att" : "");
+}
+// Sous le temps estimé du prédicteur : dépense prévue à vélo, comparée au plus gros vélo que tu as déjà fait suivre d'une course
+function noteKjCourse() {
+  const el = $("#c-pred"); if (!el) return;
+  $("#pred-kj", el)?.remove();
+  const choix = [{ id: "A", ...S.obj, priorite: "A" }, ...(S.courses || []).filter((c) => c.date >= S.today)].filter((c) => c.nom);
+  const sel = S.ui.predCourse && choix.find((c) => String(c.id || "A") === S.ui.predCourse) ? S.ui.predCourse : "A";
+  const course = choix.find((c) => String(c.id || "A") === sel) || choix[0];
+  if (!course) return;
+  const P = predire(formatCourse(course), gpxDe(course));
+  if (!P?.velo?.P || !P.velo.t) return;
+  const prevu = Math.round((P.velo.P * P.velo.t) / 1000);
+  const faits = S.acts.filter((a) => fam(a.sport) === "Run" && D.diff(S.today, a.date) <= 120 && estBrick(a)).map((r) => kjDe(veloAvant(r))).filter((x) => x > 0);
+  const maxFait = faits.length ? Math.max(...faits) : null;
+  const trop = maxFait != null && prevu > maxFait * 1.1;
+  const p = document.createElement("p"); p.id = "pred-kj"; p.className = "xt-verdict" + (trop || maxFait == null ? " att" : "");
+  p.innerHTML = `Vélo de la course : environ <b>${nf(prevu)} kJ</b>. ` + (maxFait == null
+    ? "Tu n'as pas encore d'enchaînement vélo → course avec capteur de puissance sur 4 mois pour comparer."
+    : trop ? `Ton plus gros vélo suivi d'une course à pied : <b>${nf(maxFait)} kJ</b>. Tu n'as pas encore couru après une telle dépense : prévois un enchaînement plus long avant la course, ou roule un peu en dessous de la puissance prévue.`
+    : `Tu as déjà couru après un vélo de <b>${nf(maxFait)} kJ</b> : la dépense prévue est dans ce que tu connais.`);
+  ($(".pred-total", el) || el.lastElementChild)?.after(p);
+}
+
+// ---------- 2 quater. Capacité anaérobie (records courts) ----------
+function rendreAnaerobie() {
+  const el = $("#c-anaero .xt-corps"); if (!el) return;
+  const R = S.d.durabilite, secs = R?.secs || [], i1 = secs.indexOf(60), i5 = secs.indexOf(300);
+  if (!R || !(R.frais || []).length || i1 < 0 || i5 < 0) { el.innerHTML = `<p class="muted">Pas encore de données : il faut des sorties vélo avec capteur de puissance sur les 6 derniers mois.</p>`; return; }
+  const parId = new Map(S.acts.map((a) => [String(a.id), a]));
+  const estVtt = (a) => /mountain|gravel|vtt/i.test(`${a?.sport || ""} ${a?.nom || ""}`);
+  const meilleur = (i, j0, j1, filtre) => { const v = R.frais.filter((c) => { const a = D.diff(S.today, c.date); return a >= j0 && a < j1 && (!filtre || filtre(parId.get(String(c.id)))); }).map((c) => c.watts?.[i]).filter((w) => w > 0); return v.length ? Math.max(...v) : null; };
+  const ftp = S.prof.ftp, p1 = meilleur(i1, 0, 90), p5 = meilleur(i5, 0, 90), v1 = meilleur(i1, 0, 90, estVtt), v5 = meilleur(i5, 0, 90, estVtt), a5 = meilleur(i5, 90, 181);
+  const sorties = S.acts.filter((a) => estVtt(a) && fam(a.sport) === "Ride" && Array.isArray(a.zones_puissance) && D.diff(S.today, a.date) < 90).slice(0, 8);
+  const minHaut = sorties.length ? moy(sorties.map((a) => somme(a.zones_puissance.slice(4, 7)) / 60)) : null;
+  const pct = (w) => (w && ftp ? `${Math.round((w / ftp) * 100)} % FTP` : "&nbsp;");
+  const tend = p5 && a5 ? (p5 > a5 * 1.02 ? ` Ton 5 min <b>progresse</b> (${nf(a5)} W sur les 3 mois précédents).` : p5 < a5 * 0.98 ? ` Ton 5 min <b>recule</b> (${nf(a5)} W sur les 3 mois précédents).` : " Ton 5 min est stable sur 6 mois.") : "";
+  el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">1 MIN</span><b>${p1 ? nf(p1) + " W" : "–"}</b><small>${pct(p1)}${v1 ? ` · VTT ${nf(v1)} W` : ""}</small></div><div><span class="mono-lab">5 MIN</span><b>${p5 ? nf(p5) + " W" : "–"}</b><small>${pct(p5)}${v5 ? ` · VTT ${nf(v5)} W` : ""}</small></div><div><span class="mono-lab">AU-DESSUS DU SEUIL</span><b>${minHaut != null ? nf(minHaut) + " min" : "–"}</b><small>${sorties.length ? `par sortie VTT · ${sorties.length} sortie${sorties.length > 1 ? "s" : ""}` : "aucune sortie VTT"}</small></div></div>
+    ${xtVerdict(`Un XTERRA demande deux à trois fois plus d'efforts au-dessus du seuil qu'un triathlon sur route : ce sont tes records courts et tes relances à VTT qui comptent, pas seulement la FTP.${tend}`)}
+    <p class="muted petit">Meilleures puissances sur 1 et 5 min des 90 derniers jours (toutes sorties, puis VTT et gravel seuls). « Au-dessus du seuil » : minutes passées en zone 5 et plus par sortie VTT, à défaut de pouvoir compter chaque relance.</p>`;
+}
+
+// ---------- 2 quinquies. Renforcement musculaire ----------
+function rendreRenfo() {
+  const el = $("#c-renfo .xt-corps"); if (!el) return;
+  const est = (a) => /weight|strength|crossfit|renfo|muscu|gainage/i.test(`${a.sport} ${a.nom}`);
+  const sem = [];
+  for (let k = 7; k >= 0; k--) { const l = D.add(D.lundi(S.today), -7 * k); sem.push({ l, n: S.acts.filter((a) => a.date >= l && a.date <= D.add(l, 6) && est(a)).length }); }
+  const cette = sem[7].n, moy4 = moy(sem.slice(3, 7).map((s) => s.n)) || 0;
+  let bloc = null; try { bloc = (blocsSaison().blocs || []).find((b) => b.du <= S.today && b.au >= S.today) || null; } catch (e) { bloc = null; }
+  const cible = bloc && ["specifique", "affutage"].includes(bloc.type) ? 1 : 2;
+  const manque = moy4 < cible - 0.25;
+  el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">CETTE SEMAINE</span><b>${cette}</b><small>séance${cette > 1 ? "s" : ""}</small></div><div><span class="mono-lab">MOYENNE 4 SEM.</span><b class="${manque ? "xt-att" : ""}">${nf(moy4, 1)}</b><small>par semaine</small></div><div><span class="mono-lab">CIBLE</span><b>${cible}</b><small>par semaine${bloc ? " · " + esc(String(bloc.nom).toLowerCase()) : ""}</small></div></div>
+    <div class="g" style="height:${MOBILE ? 150 : 160}px"><canvas id="g-renfo"></canvas></div>
+    ${xtVerdict(manque ? `Tu fais <b>${nf(moy4, 1)} séance par semaine</b> en moyenne, pour une cible de ${cible}. Le renforcement lourd améliore un peu l'économie de course et l'efficacité à vélo, sans prise de poids, à condition d'être régulier.` : `Tu tiens la cible de <b>${cible} séance${cible > 1 ? "s" : ""} par semaine</b>. Garde cette régularité : les gains viennent sur la durée.`, manque ? "att" : "")}
+    <p class="muted petit">Séances comptées : musculation, renfo, gainage (d'après le sport ou le nom de la séance). Cible : 2 par semaine en base et en développement, 1 en bloc spécifique et en affûtage.</p>`;
+  graph("g-renfo", { type: "bar",
+    data: { labels: sem.map((s) => D.court(s.l)), datasets: [{ label: "Séances de renfo", data: sem.map((s) => s.n), backgroundColor: sem.map((s) => (s.n >= cible ? C.vert : C.barre)), borderRadius: 4 }] },
+    options: { scales: { y: { beginAtZero: true, suggestedMax: 3, ticks: { stepSize: 1 } } } },
+  });
+}
+
+// ---------- 2 sexies. Seuil aérobie par la HRV à l'effort (DFA alpha 1) ----------
+function rendreDfa() {
+  const el = $("#c-dfa .xt-corps"); if (!el) return;
+  const L = S.acts.filter((a) => a.dfa_a1 > 0 && D.diff(S.today, a.date) <= 90 && ["Ride", "Run"].includes(fam(a.sport)));
+  if (!L.length) {
+    el.innerHTML = `<p class="muted">Aucune séance des 90 derniers jours ne contient de HRV à l'effort.</p>
+      <p class="muted petit">Pour l'obtenir : porte une ceinture thoracique et active l'enregistrement de la variabilité cardiaque sur ta montre ; Intervals.icu calcule alors le DFA α1 de la séance. Test à faire une ou deux fois par bloc, bien reposé : des paliers de 5 à 6 min de plus en plus durs. L'intensité où α1 passe sous 0,75 marque le haut de ta zone 2.</p>`;
+    return;
+  }
+  const faciles = L.filter((a) => a.if != null && a.if <= 0.75), tropDur = faciles.filter((a) => a.dfa_a1 < 0.75);
+  el.innerHTML = `<div class="defile"><table class="tab"><thead><tr><th>Date</th><th>Séance</th><th>FC</th><th>α1</th><th>Lecture</th></tr></thead><tbody>${L.slice(0, 6).map((a) => `<tr><td>${D.court(a.date)}</td><td>${esc(a.nom)}</td><td class="mono">${a.fc ?? "–"}</td><td class="mono"><b>${nf(a.dfa_a1, 2)}</b></td><td class="${a.dfa_a1 < 0.75 ? "xt-att" : "muted"}">${a.dfa_a1 >= 0.75 ? "sous le seuil aérobie" : "au-dessus du seuil aérobie"}</td></tr>`).join("")}</tbody></table></div>
+    ${xtVerdict(!faciles.length ? "Pas encore de séance d'endurance avec mesure pour juger ta zone 2." : tropDur.length ? `<b>${tropDur.length} séance${tropDur.length > 1 ? "s" : ""} d'endurance sur ${faciles.length}</b> ${tropDur.length > 1 ? "sont passées" : "est passée"} au-dessus du seuil aérobie (α1 moyen sous 0,75) : ta zone 2 est peut-être réglée un peu haut.` : `Tes ${faciles.length} séance${faciles.length > 1 ? "s" : ""} d'endurance mesurée${faciles.length > 1 ? "s" : ""} restent sous le seuil aérobie : ta zone 2 est bien calée.`, tropDur.length ? "att" : "")}
+    <p class="muted petit">α1 moyen de la séance (ceinture thoracique). Au-dessus de 0,75 : effort sous le premier seuil. Repère valable à l'état frais seulement, et moins fiable sur une moyenne de séance que sur un test par paliers.</p>`;
 }
 
 // ---------- 3. Dénivelé et terrain ----------
@@ -4498,7 +4595,10 @@ const _obsGraphs = "IntersectionObserver" in window ? new IntersectionObserver((
 }, { threshold: 0.35 }) : null;
 
 // ---------- Branchement dans le rendu ----------
-RENDUS.push(rendreJauge, rendreRpe, rendreBrick, rendreDurabilite, rendreDplus, rendreChaleur, rendreHero, () => { marquerChoix(); rendreComparaison(); });
+RENDUS.push(rendreJauge, rendreRpe, rendreBrick, rendreDurabilite, rendreAnaerobie, rendreRenfo, rendreDfa, rendreDplus, rendreChaleur, rendreHero, () => { marquerChoix(); rendreComparaison(); });
+// Le prédicteur se redessine tout seul (formulaire, GPX) : la note « kJ du vélo » est rajoutée après chaque rendu
+{ const orig = rendrePredicteur, enrobe = function () { orig(); try { noteKjCourse(); } catch (e) { console.error("noteKjCourse", e); } };
+  const i = RENDUS.indexOf(orig); if (i >= 0) RENDUS[i] = enrobe; rendrePredicteur = enrobe; }
 let _graphsAnimes = null;
 apresRendu = (function (orig) {
   return function () {
