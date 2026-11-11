@@ -4028,7 +4028,7 @@ const xtVerdict = (txt, ton) => `<p class="xt-verdict ${ton || ""}">${txt}</p>`;
       + g2(carte("c-rpe", "Charge ressentie"), carte("c-brick", "Coût de l'enchaînement vélo → course"))
       + g2(carte("c-dplus", "Dénivelé et terrain"), carte("c-chaleur", "Chaleur et efficacité"))
       + g2(carte("c-durab", "Durabilité à vélo"), carte("c-anaero", "Capacité anaérobie"))
-      + g2(carte("c-renfo", "Renforcement musculaire"), carte("c-dfa", "Seuil aérobie (HRV à l'effort)"));
+      + g2(carte("c-renfo", "Renforcement musculaire"), carte("c-z2", "Plafond de ta zone 2"));
     const apres = $(".sous-vue[data-sv='jour']", parentSv) || $(".sous-vue[data-sv='charge']", parentSv);
     (apres || ongletsAnalyse).after(sv);
   }
@@ -4311,19 +4311,36 @@ function rendreRenfo() {
   });
 }
 
-// ---------- 2 sexies. Seuil aérobie par la HRV à l'effort (DFA alpha 1) ----------
-function rendreDfa() {
-  const el = $("#c-dfa .xt-corps"); if (!el) return;
-  const L = S.acts.filter((a) => a.dfa_a1 > 0 && D.diff(S.today, a.date) <= 90 && ["Ride", "Run"].includes(fam(a.sport)));
-  if (!L.length) {
-    el.innerHTML = `<p class="muted">Aucune séance des 90 derniers jours ne contient de HRV à l'effort.</p>
-      <p class="muted petit">Pour l'obtenir : porte une ceinture thoracique et active l'enregistrement de la variabilité cardiaque sur ta montre ; Intervals.icu calcule alors le DFA α1 de la séance. Test à faire une ou deux fois par bloc, bien reposé : des paliers de 5 à 6 min de plus en plus durs. L'intensité où α1 passe sous 0,75 marque le haut de ta zone 2.</p>`;
-    return;
-  }
-  const faciles = L.filter((a) => a.if != null && a.if <= 0.75), tropDur = faciles.filter((a) => a.dfa_a1 < 0.75);
-  el.innerHTML = `<div class="defile"><table class="tab"><thead><tr><th>Date</th><th>Séance</th><th>FC</th><th>α1</th><th>Lecture</th></tr></thead><tbody>${L.slice(0, 6).map((a) => `<tr><td>${D.court(a.date)}</td><td>${esc(a.nom)}</td><td class="mono">${a.fc ?? "–"}</td><td class="mono"><b>${nf(a.dfa_a1, 2)}</b></td><td class="${a.dfa_a1 < 0.75 ? "xt-att" : "muted"}">${a.dfa_a1 >= 0.75 ? "sous le seuil aérobie" : "au-dessus du seuil aérobie"}</td></tr>`).join("")}</tbody></table></div>
-    ${xtVerdict(!faciles.length ? "Pas encore de séance d'endurance avec mesure pour juger ta zone 2." : tropDur.length ? `<b>${tropDur.length} séance${tropDur.length > 1 ? "s" : ""} d'endurance sur ${faciles.length}</b> ${tropDur.length > 1 ? "sont passées" : "est passée"} au-dessus du seuil aérobie (α1 moyen sous 0,75) : ta zone 2 est peut-être réglée un peu haut.` : `Tes ${faciles.length} séance${faciles.length > 1 ? "s" : ""} d'endurance mesurée${faciles.length > 1 ? "s" : ""} restent sous le seuil aérobie : ta zone 2 est bien calée.`, tropDur.length ? "att" : "")}
-    <p class="muted petit">α1 moyen de la séance (ceinture thoracique). Au-dessus de 0,75 : effort sous le premier seuil. Repère valable à l'état frais seulement, et moins fiable sur une moyenne de séance que sur un test par paliers.</p>`;
+// ---------- 2 sexies. Plafond de la zone 2 (dérive cardiaque) ----------
+// Même question que le DFA α1, sans ceinture ni matériel : jusqu'à quelle puissance la FC reste-t-elle stable
+// sur une sortie d'endurance d'une heure ou plus ? Sous 5 % de dérive, l'effort est sous le seuil aérobie.
+function rendrePlafondZ2() {
+  const el = $("#c-z2 .xt-corps"); if (!el) return;
+  const ftp = S.prof.ftp, hautZ2 = Math.round(ftp * 0.75);
+  const L = S.acts.filter((a) => fam(a.sport) === "Ride" && a.decouplage != null && a.np > 0 && a.duree_s >= 3600 && D.diff(S.today, a.date) <= 120);
+  if (L.length < 3) { el.innerHTML = `<p class="muted">Il faut au moins 3 sorties vélo d'endurance d'une heure ou plus, régulières (moins de 10 % du temps en zone 3 et plus), sur 4 mois. Pour l'instant : ${L.length}.</p><p class="muted petit">Une sortie continue en zone 2, sans blocs intenses, suffit : c'est la dérive de ta FC par rapport à la puissance qui sert de mesure.</p>`; return; }
+  const stables = L.filter((a) => a.decouplage < 5), derives = L.filter((a) => a.decouplage >= 5);
+  const plafond = stables.length ? Math.max(...stables.map((a) => a.np)) : null;
+  const premiereDerive = derives.length ? Math.min(...derives.map((a) => a.np)) : null;
+  const pct = (w) => `${Math.round((w / ftp) * 100)} % FTP`;
+  let txt, ton = "";
+  if (plafond == null) { txt = `Ta FC dérive sur toutes tes sorties d'endurance mesurées, dès <b>${nf(premiereDerive)} W</b>. Roule plus bas, ou vérifie hydratation, glucides et chaleur sur ces sorties.`; ton = "att"; }
+  else if (premiereDerive != null && premiereDerive < hautZ2 && premiereDerive <= plafond) { txt = `Ta FC est restée stable jusqu'à <b>${nf(plafond)} W</b>, mais elle a déjà dérivé à <b>${nf(premiereDerive)} W</b>, sous le haut de ta zone 2 (${hautZ2} W). Résultat irrégulier : regarde la durée, la chaleur et les glucides de ces sorties.`; ton = "att"; }
+  else if (plafond >= hautZ2 * 0.95) txt = `Ta FC reste stable jusqu'à <b>${nf(plafond)} W</b> (${pct(plafond)}) : le haut de ta zone 2 (${hautZ2} W) est bien calé, voire un peu bas.`;
+  else txt = `Ta FC reste stable jusqu'à <b>${nf(plafond)} W</b> (${pct(plafond)}). Tu n'as pas encore de sortie régulière plus haut pour confirmer le haut de ta zone 2 (${hautZ2} W) : une sortie continue de 1 h 30 vers ${Math.round(ftp * 0.7)}–${hautZ2} W le dira.`;
+  el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">FC STABLE JUSQU'À</span><b>${plafond != null ? nf(plafond) + " W" : "–"}</b><small>${plafond != null ? pct(plafond) : "&nbsp;"}</small></div><div><span class="mono-lab">HAUT DE ZONE 2</span><b>${hautZ2} W</b><small>75 % FTP</small></div><div><span class="mono-lab">SORTIES</span><b>${stables.length} / ${L.length}</b><small>sous 5 % de dérive</small></div></div>
+    <div class="g" style="height:${MOBILE ? 180 : 200}px"><canvas id="g-z2"></canvas></div>
+    ${xtVerdict(txt, ton)}
+    <p class="muted petit">Chaque point est une sortie vélo d'endurance d'une heure ou plus, sur 4 mois : puissance normalisée en bas, dérive de la FC par rapport à la puissance à gauche. Sous 5 %, l'effort est resté sous le seuil aérobie. Remplace le test par la HRV à l'effort, qui demande une ceinture thoracique.</p>`;
+  const xs = L.map((a) => a.np);
+  graph("g-z2", { type: "scatter",
+    data: { datasets: [
+      { label: "Dérive stable", data: stables.map((a) => ({ x: a.np, y: a.decouplage })), backgroundColor: C.vert, pointRadius: 5 },
+      { label: "Dérive marquée", data: derives.map((a) => ({ x: a.np, y: a.decouplage })), backgroundColor: C.orange, pointRadius: 5 },
+      { label: "Repère 5 %", type: "line", data: [{ x: Math.min(...xs) - 5, y: 5 }, { x: Math.max(...xs) + 5, y: 5 }], borderColor: C.doux, borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 },
+    ] },
+    options: { interaction: { mode: "nearest", intersect: true }, scales: { x: { type: "linear", title: { display: true, text: "Puissance normalisée (W)" } }, y: { title: { display: !MOBILE, text: "Dérive FC (%)" } } } },
+  });
 }
 
 // ---------- 3. Dénivelé et terrain ----------
@@ -4597,7 +4614,7 @@ const _obsGraphs = "IntersectionObserver" in window ? new IntersectionObserver((
 }, { threshold: 0.35 }) : null;
 
 // ---------- Branchement dans le rendu ----------
-RENDUS.push(rendreJauge, rendreRpe, rendreBrick, rendreDurabilite, rendreAnaerobie, rendreRenfo, rendreDfa, rendreDplus, rendreChaleur, rendreHero, () => { marquerChoix(); rendreComparaison(); });
+RENDUS.push(rendreJauge, rendreRpe, rendreBrick, rendreDurabilite, rendreAnaerobie, rendreRenfo, rendrePlafondZ2, rendreDplus, rendreChaleur, rendreHero, () => { marquerChoix(); rendreComparaison(); });
 // Le prédicteur se redessine tout seul (formulaire, GPX) : la note « kJ du vélo » est rajoutée après chaque rendu
 { const orig = rendrePredicteur, enrobe = function () { orig(); try { noteKjCourse(); } catch (e) { console.error("noteKjCourse", e); } };
   const i = RENDUS.indexOf(orig); if (i >= 0) RENDUS[i] = enrobe; rendrePredicteur = enrobe; }
