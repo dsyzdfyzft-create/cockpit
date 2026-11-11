@@ -531,7 +531,7 @@ body { font-size: 15px; overscroll-behavior-y: none; }
 .haut { position: sticky; top: 0; z-index: 5; background: var(--verre); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); padding: calc(env(safe-area-inset-top, 0px) + 10px) 18px 10px; margin-top: calc(-1 * env(safe-area-inset-top, 0px)); border-bottom: 1px solid var(--ligne); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .haut h1 { margin: 0; font-size: 1.75rem; letter-spacing: -0.03em; font-weight: 700; }
 .haut .sync-txt { font: 400 10px var(--mono); color: var(--texte3); letter-spacing: 0.03em; max-width: 220px; }
-.btn-rond { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--ligne); background: var(--surface); display: grid; place-items: center; flex: none; }
+.btn-rond { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--ligne); background: var(--surface); color: var(--encre); text-decoration: none; display: grid; place-items: center; flex: none; }
 .btn-rond svg { width: 19px; height: 19px; }
 .btn-rond.tourne svg { animation: tour 0.9s linear infinite; }
 @keyframes tour { to { transform: rotate(360deg); } }
@@ -1282,7 +1282,7 @@ function rendreDecision() {
     <p class="dec-txt">${prevuTxt}${s.est_aujourdhui ? "" : ` <span class="muted">Dernier rapport : ${D.fmt(s.date, { weekday: "long", day: "numeric", month: "long" })}.</span>`}</p>
     <div class="dec-stats">
       <div><b>${s.sleep_perf ?? "–"}<small>%</small></b><span>Sommeil (${dureeFmt(s.dormi_min != null ? s.dormi_min * 60 : null)} / ${dureeFmt(s.sleep_need_min != null ? s.sleep_need_min * 60 : null)})</span></div>
-      <div><b>${s.strain ?? "–"}</b><span>Strain d'hier</span></div>
+      <div><b>${s.strain != null ? nf(s.strain, 1) : "–"}</b><span>Strain d'hier</span></div>
       <div><b>${esc(s.bedtime ?? "–")}</b><span>Coucher conseillé</span></div>
       <div><b>${s.regularite ?? "–"}<small>%</small></b><span>Régularité</span></div>
     </div>`;
@@ -2700,7 +2700,7 @@ function rendreNutrition() {
     const [lo, hi] = f === "Swim" ? [0, 0] : cibleGlucides(h, IF, e.sport);
     return `<tr><td>${jourRelatif(e.date)}</td><td class="nom"><span class="pastille" style="background:${SPORTS[f].c}"></span>${esc(e.nom)}</td><td>${dureeFmt(e.duree_s)}</td>
       <td><b>${hi ? `${lo}–${hi} g/h` : f === "Swim" ? "avant / après" : "eau"}</b></td><td>${hi ? `${Math.round(lo * h)}–${Math.round(hi * h)} g` : "–"}</td>
-      <td>${Math.round(B.g)} g/h</td><td>${f === "Swim" ? "au bord du bassin" : h >= 1 ? `${Math.round(0.5 * h * 10) / 10}–${Math.round(0.8 * h * 10) / 10} L` : "selon soif"}</td></tr>`;
+      <td>${Math.round(B.g)} g/h</td><td>${f === "Swim" ? "au bord du bassin" : h >= 1 ? `${nf(0.5 * h, 1)}–${nf(0.8 * h, 1)} L` : "selon soif"}</td></tr>`;
   }).join("");
 
   // Historique : sorties de plus de 75 min

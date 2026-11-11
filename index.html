@@ -524,7 +524,7 @@ a.btn { text-decoration: none; color: inherit; }
 @media (max-width: 640px) { .z-grille { grid-template-columns: repeat(min(var(--n), 4), 1fr); } }
 
 /* ---------- Mise en page ordinateur ---------- */
-.cadre { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
+.cadre { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100vh; }
 .lateral { background: #0e1013; color: #d7dbe2; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
 .marque { display: flex; align-items: center; gap: 12px; padding: 26px 22px; border-bottom: 1px solid #1d2026; font-weight: 600; color: #fff; font-size: 1.12rem; }
 .marque span { color: #8a9099; font-weight: 400; }
@@ -540,7 +540,7 @@ a.btn { text-decoration: none; color: inherit; }
 .lat-bas { margin-top: auto; padding: 18px 20px; border-top: 1px solid #1d2026; display: flex; gap: 12px; align-items: center; }
 .avatar { width: 34px; height: 34px; border-radius: 50%; background: #b8325a; color: #fff; display: grid; place-items: center; font-weight: 600; }
 .lat-bas small { display: block; color: #8a9099; }
-main { padding: 44px 48px 60px; max-width: 1320px; width: 100%; }
+main { padding: 44px 48px 60px; max-width: 1320px; width: 100%; min-width: 0; }
 .entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }
 .entete h1 { font-size: 2.3rem; letter-spacing: -0.03em; margin: 0; font-weight: 700; }
 .sync-txt { font: 400 15px var(--mono); color: var(--doux); margin-top: 6px; letter-spacing: 0.02em; }
@@ -550,12 +550,13 @@ h2.sec { font-size: 1.6rem; letter-spacing: -0.02em; margin: 54px 0 0; padding-b
 .sec + .pile, .sec + .grille3, .sec + .grille2 { margin-top: 26px; }
 .grille3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
 .grille2 { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+.grille2 > *, .grille3 > *, .grille2-large > * { min-width: 0; }
 .decision { border: 1px solid var(--ligne); border-left: 4px solid var(--encre); border-radius: 6px; padding: 22px 26px; margin: 26px 0; }
 .vue[hidden] { display: none; }
 @media (max-width: 1250px) { .saison-resume { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 1250px) { .nutri-tete { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 1250px) { .kpi .val { font-size: 36px; } .grille3 { grid-template-columns: 1fr 1fr; } .six { grid-template-columns: repeat(3, 1fr); row-gap: 20px; } }
-@media (max-width: 1000px) { .cadre { grid-template-columns: 1fr; } .lateral { position: static; height: auto; } .nav { flex-direction: row; } .lat-bas { display: none; } main { padding: 28px 22px; } .kpis { grid-template-columns: repeat(3, 1fr); } .kpi:nth-child(4) { border-left: 0; } .kpi:nth-child(n+4) { border-top: 1px solid var(--ligne); } .grille2, .grille3 { grid-template-columns: 1fr; } .jours { grid-template-columns: repeat(4, 1fr); } .cinq { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1000px) { .cadre { grid-template-columns: minmax(0, 1fr); } .lateral { position: sticky; top: 0; z-index: 40; height: auto; flex-direction: row; align-items: center; flex-wrap: wrap; } .marque { padding: 12px 18px; border-bottom: 0; } .nav { flex: 1; min-width: 0; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px; padding: 8px 12px 8px 0; } .nav button { padding: 9px 12px; border-left: 0; border-bottom: 3px solid transparent; border-radius: 6px 6px 0 0; } .nav button.on { border-bottom-color: var(--lime); } .nav .sous-nav { display: none !important; } .xt-cherche { margin-left: auto; } .xt-cherche kbd { display: none; } .lat-bas { display: none; } main { padding: 28px 22px; } .kpis { grid-template-columns: repeat(3, 1fr); } .kpi:nth-child(4) { border-left: 0; } .kpi:nth-child(n+4) { border-top: 1px solid var(--ligne); } .grille2, .grille3 { grid-template-columns: 1fr; } .jours { grid-template-columns: repeat(4, 1fr); } .cinq { grid-template-columns: repeat(3, 1fr); } }
 
 /* ================= Thème sombre ================= */
 :root[data-theme="dark"] {
@@ -1272,7 +1273,7 @@ function rendreDecision() {
     <p class="dec-txt">${prevuTxt}${s.est_aujourdhui ? "" : ` <span class="muted">Dernier rapport : ${D.fmt(s.date, { weekday: "long", day: "numeric", month: "long" })}.</span>`}</p>
     <div class="dec-stats">
       <div><b>${s.sleep_perf ?? "–"}<small>%</small></b><span>Sommeil (${dureeFmt(s.dormi_min != null ? s.dormi_min * 60 : null)} / ${dureeFmt(s.sleep_need_min != null ? s.sleep_need_min * 60 : null)})</span></div>
-      <div><b>${s.strain ?? "–"}</b><span>Strain d'hier</span></div>
+      <div><b>${s.strain != null ? nf(s.strain, 1) : "–"}</b><span>Strain d'hier</span></div>
       <div><b>${esc(s.bedtime ?? "–")}</b><span>Coucher conseillé</span></div>
       <div><b>${s.regularite ?? "–"}<small>%</small></b><span>Régularité</span></div>
     </div>`;
@@ -2690,7 +2691,7 @@ function rendreNutrition() {
     const [lo, hi] = f === "Swim" ? [0, 0] : cibleGlucides(h, IF, e.sport);
     return `<tr><td>${jourRelatif(e.date)}</td><td class="nom"><span class="pastille" style="background:${SPORTS[f].c}"></span>${esc(e.nom)}</td><td>${dureeFmt(e.duree_s)}</td>
       <td><b>${hi ? `${lo}–${hi} g/h` : f === "Swim" ? "avant / après" : "eau"}</b></td><td>${hi ? `${Math.round(lo * h)}–${Math.round(hi * h)} g` : "–"}</td>
-      <td>${Math.round(B.g)} g/h</td><td>${f === "Swim" ? "au bord du bassin" : h >= 1 ? `${Math.round(0.5 * h * 10) / 10}–${Math.round(0.8 * h * 10) / 10} L` : "selon soif"}</td></tr>`;
+      <td>${Math.round(B.g)} g/h</td><td>${f === "Swim" ? "au bord du bassin" : h >= 1 ? `${nf(0.5 * h, 1)}–${nf(0.8 * h, 1)} L` : "selon soif"}</td></tr>`;
   }).join("");
 
   // Historique : sorties de plus de 75 min
