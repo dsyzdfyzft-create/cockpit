@@ -59,6 +59,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .grand small { font: 400 20px var(--mono); color: var(--doux); letter-spacing: 0; }
 .barre { height: 7px; border-radius: 4px; background: var(--piste); overflow: hidden; }
 .barre i { display: block; height: 100%; border-radius: 4px; }
+/* Matériel (km par paire) */
+.mat { padding: 10px 0; border-bottom: 1px solid var(--ligne2); }
+.mat:last-child { border-bottom: 0; padding-bottom: 2px; }
+.mat-t { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.mat-t b { font-weight: 600; }
+.mat-t .mono { font-size: 12px; color: var(--texte2); white-space: nowrap; }
+.mat-s { margin-top: 5px; }
 .degrade { position: relative; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #3f5a3a, #8a8a3c 30%, #e8a05a 60%, #e86a5a); margin-bottom: 4px; }
 .degrade i { position: absolute; top: -5px; width: 3px; height: 18px; background: var(--encre); border-radius: 2px; transform: translateX(-1px); }
 .trio { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--ligne); }
@@ -841,6 +848,7 @@ h2.sec { font-size: 1.2rem; letter-spacing: -0.02em; margin: 30px 2px 12px; font
         <div class="carte"><div class="carte-titre"><h3>Zones du jour</h3><div class="seg seg-mini seg-zones"><button data-zones="5">5 z</button><button data-zones="3">3 z</button></div></div><div id="c-zones"></div></div>
         <div class="carte"><div class="carte-titre"><h3>Météo</h3></div><div id="c-meteo"></div></div>
         <div class="carte"><div class="carte-titre"><h3>Séances récentes</h3></div><div class="journal" id="c-log"></div></div>
+        <div class="carte"><div class="carte-titre"><h3>Matériel</h3></div><div id="c-materiel"></div></div>
       </div>
     </section>
 
@@ -2518,7 +2526,7 @@ async function charger() {
 const RENDUS = [rendreEntete, rendreKpis, rendreDecision, rendreReadiness, rendreDrapeau, rendreEquilibre, rendreZones, rendreJournal,
   rendreGlissant, rendrePmc, rendreVolume, rendreAllure, rendreEfficacite, rendreRepartition, rendreZonesRep, rendrePuissance,
   rendreBienEtre, rendreDeuxHrv, rendrePoids, rendreCourse, rendreArc, rendrePlan,
-  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram];
+  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel];
 
 function toutRendre() {
   if (!S.d) return;
@@ -3369,6 +3377,29 @@ function ouvrirModal(id) {
   };
 }
 function fermerModal() { const m = $("#modal-evt"); if (m) m.hidden = true; }
+
+// ============================================================
+// Matériel : km par paire active (barre verte, orange dès 80 %, rouge à 100 % du seuil d'usure)
+// ============================================================
+function rendreMateriel() {
+  const el = $("#c-materiel"); if (!el) return;
+  const L = (S.d.materiel ?? []).filter((p) => p.actif)
+    .sort((a, b) => (a.sport + a.role).localeCompare(b.sport + b.role) || b.pct - a.pct);
+  if (!L.length) { el.innerHTML = `<p class="muted pad">Aucune paire suivie pour l'instant.</p>`; return; }
+  const ROLE = { quotidien: "Quotidien", competition: "Compétition", trail: "Trail" };
+  const kms = (km) => (U() === "km" ? `${nf(km)} km` : `${nf(km / 1.60934)} mi`);
+  el.innerHTML = L.map((p) => {
+    const pct = Number(p.pct) || 0, coul = pct >= 100 ? C.rouge : pct >= 80 ? C.orange : C.vert;
+    const info = [ROLE[p.role] ?? p.role, p.nb_sorties ? `${p.nb_sorties} sortie${p.nb_sorties > 1 ? "s" : ""} suivie${p.nb_sorties > 1 ? "s" : ""}` : null,
+      p.derniere_utilisation ? "dernière : " + D.court(p.derniere_utilisation) : null].filter(Boolean).join(" · ");
+    const conseil = pct >= 80 ? (p.role === "competition" ? "Passe-la à l'entraînement." : pct >= 100 ? "Seuil d'usure atteint : à remplacer." : "Pense à prévoir la remplaçante.") : "";
+    return `<div class="mat">
+      <div class="mat-t"><b>👟 ${esc(p.nom)}</b><span class="mono">${kms(p.km_total)} / ${kms(p.km_alerte)} · ${pct} %</span></div>
+      <div class="barre"><i style="width:${Math.min(100, pct)}%;background:${coul}"></i></div>
+      <div class="muted petit mat-s">${esc(info)}${conseil ? ` · <span style="color:${coul}">${conseil}</span>` : ""}</div>
+    </div>`;
+  }).join("");
+}
 
 function rendreLienTelegram() {
   const bot = S.d?.telegram_bot;
