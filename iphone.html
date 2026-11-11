@@ -4031,7 +4031,9 @@ const xtVerdict = (txt, ton) => `<p class="xt-verdict ${ton || ""}">${txt}</p>`;
       + g2(carte("c-rpe", "Charge ressentie"), carte("c-brick", "Coût de l'enchaînement vélo → course"))
       + g2(carte("c-dplus", "Dénivelé et terrain"), carte("c-chaleur", "Chaleur et efficacité"))
       + g2(carte("c-durab", "Durabilité à vélo"), carte("c-anaero", "Capacité anaérobie"))
-      + g2(carte("c-renfo", "Renforcement musculaire"), carte("c-z2", "Plafond de ta zone 2"));
+      + g2(carte("c-renfo", "Renforcement musculaire"), carte("c-z2", "Plafond de ta zone 2"))
+      + g2(carte("c-vc", "Vitesse critique en course à pied"), carte("c-nage", "Efficacité de nage"))
+      + carte("c-relances", "Test de relances VTT", '<span class="muted petit">4 sprints de 30 s</span>');
     const apres = $(".sous-vue[data-sv='jour']", parentSv) || $(".sous-vue[data-sv='charge']", parentSv);
     (apres || ongletsAnalyse).after(sv);
   }
@@ -4184,6 +4186,7 @@ function rendreBrick() {
     <div class="g" style="height:${MOBILE ? 180 : 200}px"><canvas id="g-brick"></canvas></div>
     ${xtVerdict(`À fréquence cardiaque égale, tu cours <b>${Math.abs(perte)} s/km ${perte >= 0 ? "moins vite" : "plus vite"}</b> après le vélo.${tend}`, perte > 20 ? "att" : "")}
     ${brickKj(B, fcRef)}
+    ${brickVi(B, fcRef)}
     <p class="muted petit">Efficacité = vitesse ÷ FC moyenne, sur les 6 dernières courses de chaque type. Enchaînement : départ moins de 45 min après la fin réelle d'un vélo (arrêts compris), le même jour.</p>`;
   const pt = (r) => ({ x: D.parse(r.a.date).getTime(), y: Math.round(r.ef * 100) / 100 });
   graph("g-brick", { type: "scatter",
@@ -4344,6 +4347,78 @@ function rendrePlafondZ2() {
     ] },
     options: { interaction: { mode: "nearest", intersect: true }, scales: { x: { type: "linear", title: { display: true, text: "Puissance normalisée (W)" } }, y: { title: { display: !MOBILE, text: "Dérive FC (%)" } } } },
   });
+}
+
+// ---------- 2 septies. Vitesse critique en course à pied ----------
+// L'équivalent de la FTP en course : pente de la droite distance = vitesse × temps, sur tes meilleurs efforts de 2 min 30 à 25 min.
+function rendreVitesseCritique() {
+  const el = $("#c-vc .xt-corps"); if (!el) return;
+  const R = S.d.courbe_allure;
+  const tous = (R?.distance_m || []).map((d, i) => ({ d, t: R.secs?.[i] })).filter((p) => p.d > 0 && p.t > 0 && p.d / p.t > 1.5 && p.d / p.t < 7.5);
+  const pts = tous.filter((p) => p.t >= 150 && p.t <= 1500);
+  if (pts.length < 3) { el.innerHTML = `<p class="muted">Pas assez de données : il faut des efforts de course à pied de 3 à 25 min sur les 90 derniers jours.</p>`; return; }
+  const n = pts.length, mt = somme(pts.map((p) => p.t)) / n, md = somme(pts.map((p) => p.d)) / n;
+  const vc = somme(pts.map((p) => (p.t - mt) * (p.d - md))) / somme(pts.map((p) => (p.t - mt) ** 2));
+  if (!(vc > 1.5 && vc < 7)) { el.innerHTML = `<p class="muted">Calcul impossible avec tes efforts récents (résultat incohérent). Un 5 min et un 12 min à fond suffiraient à le fiabiliser.</p>`; return; }
+  const allVc = 1000 / vc, seuil = S.prof.allure_seuil_s_km, ecart = Math.round(allVc - seuil);
+  const proche = (cible) => tous.reduce((b, p) => (Math.abs(p.d - cible) < Math.abs(b.d - cible) ? p : b), tous[0]);
+  const reperes = [1000, 3000, 5000].map(proche).filter((p, i, a) => a.findIndex((q) => q.d === p.d) === i && [1000, 3000, 5000].some((c) => Math.abs(p.d - c) <= c * 0.15));
+  const txt = ecart <= -6 ? `Ta vitesse critique est <b>${Math.abs(ecart)} s/km plus rapide</b> que ton allure seuil réglée : tu as progressé, tes zones de course sont sans doute trop lentes.`
+    : ecart >= 10 ? `Ta vitesse critique sort <b>${ecart} s/km plus lente</b> que ton allure seuil réglée. Le plus souvent, c'est qu'il manque des efforts à fond entre 3 et 20 min sur 90 jours ; sinon, ton seuil est optimiste.`
+    : `Ta vitesse critique colle à ton allure seuil réglée (écart de ${Math.abs(ecart)} s/km) : tes zones de course sont bien calées.`;
+  el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">VITESSE CRITIQUE</span><b>${mmss(allVc)}/km</b><small>${nf(vc * 3.6, 1)} km/h</small></div><div><span class="mono-lab">SEUIL RÉGLÉ</span><b>${mmss(seuil)}/km</b><small>dans Intervals</small></div><div><span class="mono-lab">ÉCART</span><b class="${Math.abs(ecart) >= 10 ? "xt-att" : ""}">${ecart > 0 ? "+" : ecart < 0 ? "−" : ""}${Math.abs(ecart)} s/km</b><small>${n} efforts utilisés</small></div></div>
+    ${reperes.length ? `<p class="petit">Tes meilleurs efforts sur 90 jours : ${reperes.map((p) => `<b>${nf(p.d / 1000, 1)} km</b> en ${mmss(p.t)} (${mmss(p.t / (p.d / 1000))}/km)`).join(" · ")}</p>` : ""}
+    ${xtVerdict(txt, Math.abs(ecart) >= 10 ? "att" : "")}
+    <p class="muted petit">Calculée sur tes meilleures allures de 2 min 30 à 25 min des 90 derniers jours, sans test spécial. Elle n'est juste que si ces efforts étaient proches du maximum : elle sous-estime ton niveau si tu n'as couru qu'en endurance.</p>`;
+}
+
+// ---------- 2 octies. Efficacité de nage ----------
+// Indice de nage = vitesse × longueur de coup de bras : nager vite avec peu de coups.
+function rendreNage() {
+  const el = $("#c-nage .xt-corps"); if (!el) return;
+  const L = S.acts.filter((a) => fam(a.sport) === "Swim" && a.vitesse_ms > 0.4 && a.cadence > 10 && D.diff(S.today, a.date) <= 180)
+    .map((a) => { const lc = (a.vitesse_ms * 60) / a.cadence; return { a, lc, ind: a.vitesse_ms * lc, libre: /open/i.test(a.sport) }; });
+  if (L.length < 3) { el.innerHTML = `<p class="muted">Pas assez de données : ta montre n'envoie pas (ou pas encore) la fréquence de coups de bras à Intervals.icu pour tes séances de natation. ${L.length} séance(s) exploitable(s) sur 6 mois.</p>`; return; }
+  const rec = L.slice(0, 5), anc = L.slice(5, 12);
+  const ind = moy(rec.map((x) => x.ind)), indAnc = anc.length >= 3 ? moy(anc.map((x) => x.ind)) : null;
+  const bassin = L.filter((x) => !x.libre), libre = L.filter((x) => x.libre);
+  const tend = indAnc == null ? "" : ind > indAnc * 1.02 ? " Ton indice <b>progresse</b> : tu avances plus à chaque coup de bras." : ind < indAnc * 0.98 ? " Ton indice <b>recule</b> : regarde si c'est la vitesse ou la longueur de coup qui baisse." : " Indice stable.";
+  const eau = libre.length >= 2 && bassin.length >= 2 ? ` En eau libre, ta longueur de coup passe de <b>${nf(moy(bassin.map((x) => x.lc)), 2)} m</b> à <b>${nf(moy(libre.map((x) => x.lc)), 2)} m</b>.` : "";
+  el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">INDICE DE NAGE</span><b>${nf(ind, 2)}</b><small>5 dernières séances</small></div><div><span class="mono-lab">LONGUEUR DE COUP</span><b>${nf(moy(rec.map((x) => x.lc)), 2)} m</b><small>par coup de bras</small></div><div><span class="mono-lab">FRÉQUENCE</span><b>${nf(moy(rec.map((x) => x.a.cadence)))}</b><small>coups / min</small></div></div>
+    <div class="g" style="height:${MOBILE ? 160 : 180}px"><canvas id="g-nage"></canvas></div>
+    ${xtVerdict(`L'indice de nage (vitesse × longueur de coup) est le meilleur prédicteur du temps en eau libre chez des triathlètes.${tend}${eau}`)}
+    <p class="muted petit">Calculé sur la moyenne de chaque séance (éducatifs et récupérations compris), donc à lire en tendance, pas en valeur absolue.</p>`;
+  const pt = (x) => ({ x: D.parse(x.a.date).getTime(), y: Math.round(x.ind * 100) / 100 });
+  graph("g-nage", { type: "scatter",
+    data: { datasets: [{ label: "Bassin", data: bassin.map(pt), backgroundColor: SPORTS.Swim.c, pointRadius: 4 }, { label: "Eau libre", data: libre.map(pt), backgroundColor: C.orange, pointRadius: 5 }] },
+    options: { interaction: { mode: "nearest", intersect: true }, scales: { x: { type: "linear", ticks: { callback: (v) => D.court(new Date(v).toISOString()), maxTicksLimit: 5 } }, y: { title: { display: !MOBILE, text: "Indice de nage" } } } },
+  });
+}
+
+// ---------- 2 nonies. Test de relances (4 × 30 s) ----------
+function rendreRelances() {
+  const el = $("#c-relances .xt-corps"); if (!el) return;
+  const T = (S.d.tests_relances || []).filter((t) => (t.sprints || []).length >= 3).sort((a, b) => b.date.localeCompare(a.date));
+  const protocole = `<p class="muted petit">Protocole : 20 min d'échauffement, puis 4 sprints de 30 s à fond avec 1 min très facile entre chaque, sur une montée régulière ou sur home-trainer. Nomme la séance « test relances » pour qu'elle apparaisse ici. Une fois par bloc, bien reposé.</p>`;
+  if (!T.length) { el.innerHTML = `<p class="muted">Aucun test trouvé sur 6 mois.</p>${xtVerdict("Chez des vététistes de cross-country, ce test de quatre sprints explique l'essentiel des écarts de temps en course : c'est la qualité la plus spécifique au VTT d'un XTERRA.")}${protocole}`; return; }
+  const res = (t) => { const s = t.sprints.slice(0, 4); return { moy: moy(s), chute: ((s[0] - s[s.length - 1]) / s[0]) * 100, s }; };
+  const d = res(T[0]), p = T[1] ? res(T[1]) : null, kg = poidsActuel();
+  const tend = !p ? "" : d.moy > p.moy * 1.02 ? ` En progrès depuis le test du ${D.court(T[1].date)} (${nf(p.moy)} W).` : d.moy < p.moy * 0.98 ? ` En recul depuis le test du ${D.court(T[1].date)} (${nf(p.moy)} W).` : ` Stable depuis le test du ${D.court(T[1].date)}.`;
+  el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">MOYENNE DES SPRINTS</span><b>${nf(d.moy)} W</b><small>${kg ? nf(d.moy / kg, 1) + " W/kg" : "&nbsp;"}</small></div><div><span class="mono-lab">CHUTE 1ER → DERNIER</span><b class="${d.chute > 15 ? "xt-att" : ""}">${nf(d.chute)} %</b><small>${d.s.map((w) => nf(w)).join(" · ")} W</small></div><div><span class="mono-lab">DERNIER TEST</span><b>${D.court(T[0].date)}</b><small>${T.length} test${T.length > 1 ? "s" : ""} sur 6 mois</small></div></div>
+    ${xtVerdict(`${d.chute > 15 ? `Tu perds <b>${nf(d.chute)} %</b> entre le premier et le dernier sprint : c'est la répétition des efforts qui te limite, plus que la puissance maximale.` : `Tu ne perds que <b>${nf(d.chute)} %</b> entre le premier et le dernier sprint : bonne capacité à répéter les efforts.`}${tend}`, d.chute > 15 ? "att" : "")}
+    ${protocole}`;
+}
+
+// Enchaînement : effet de l'irrégularité du vélo (puissance normalisée ÷ puissance moyenne) sur la course qui suit
+function brickVi(B, fcRef) {
+  const L = B.map((r) => { const v = veloAvant(r.a); return { ef: r.ef, vi: v?.np > 0 && v?.pmoy > 0 ? v.np / v.pmoy : null }; }).filter((x) => x.vi);
+  if (L.length < 4) return "";
+  const tri = L.map((x) => x.vi).sort((a, b) => a - b), med = tri[Math.floor(tri.length / 2)];
+  const irreg = L.filter((x) => x.vi >= med), regul = L.filter((x) => x.vi < med);
+  if (!irreg.length || !regul.length) return "";
+  const all = (G) => 1000 / ((moy(G.map((x) => x.ef)) * fcRef) / 60);
+  const ecart = Math.round(all(irreg) - all(regul));
+  return `<p class="muted petit">Régularité du vélo : après un vélo irrégulier (indice de variabilité de ${nf(med, 2)} ou plus), tu cours à ${mmss(all(irreg))}/km contre ${mmss(all(regul))}/km après un vélo régulier${ecart > 5 ? `, soit ${ecart} s/km de perdu.` : " : pas d'effet net."}</p>`;
 }
 
 // ---------- 3. Dénivelé et terrain ----------
@@ -4617,7 +4692,7 @@ const _obsGraphs = "IntersectionObserver" in window ? new IntersectionObserver((
 }, { threshold: 0.35 }) : null;
 
 // ---------- Branchement dans le rendu ----------
-RENDUS.push(rendreJauge, rendreRpe, rendreBrick, rendreDurabilite, rendreAnaerobie, rendreRenfo, rendrePlafondZ2, rendreDplus, rendreChaleur, rendreHero, () => { marquerChoix(); rendreComparaison(); });
+RENDUS.push(rendreJauge, rendreRpe, rendreBrick, rendreDurabilite, rendreAnaerobie, rendreRenfo, rendrePlafondZ2, rendreVitesseCritique, rendreNage, rendreRelances, rendreDplus, rendreChaleur, rendreHero, () => { marquerChoix(); rendreComparaison(); });
 // Le prédicteur se redessine tout seul (formulaire, GPX) : la note « kJ du vélo » est rajoutée après chaque rendu
 { const orig = rendrePredicteur, enrobe = function () { orig(); try { noteKjCourse(); } catch (e) { console.error("noteKjCourse", e); } };
   const i = RENDUS.indexOf(orig); if (i >= 0) RENDUS[i] = enrobe; rendrePredicteur = enrobe; }
