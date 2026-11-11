@@ -4029,7 +4029,8 @@ const xtVerdict = (txt, ton) => `<p class="xt-verdict ${ton || ""}">${txt}</p>`;
     const g2 = (a, b) => (MOBILE ? a + b : `<div class="grille2">${a}${b}</div>`);
     sv.innerHTML = carte("c-jauge", "Prêt pour Molveno", '<span class="muted petit">5 piliers de la course</span>')
       + g2(carte("c-rpe", "Charge ressentie"), carte("c-brick", "Coût de l'enchaînement vélo → course"))
-      + g2(carte("c-dplus", "Dénivelé et terrain"), carte("c-chaleur", "Chaleur et efficacité"));
+      + g2(carte("c-dplus", "Dénivelé et terrain"), carte("c-chaleur", "Chaleur et efficacité"))
+      + carte("c-durab", "Durabilité à vélo", '<span class="muted petit">puissance gardée après une grosse dépense</span>');
     const apres = $(".sous-vue[data-sv='jour']", parentSv) || $(".sous-vue[data-sv='charge']", parentSv);
     (apres || ongletsAnalyse).after(sv);
   }
@@ -4189,6 +4190,43 @@ function rendreBrick() {
       { label: "Course seule", data: F.map(pt), backgroundColor: "#3b6cf0", pointRadius: 4 },
     ] },
     options: { interaction: { mode: "nearest", intersect: true }, scales: { x: { type: "linear", ticks: { callback: (v) => D.court(new Date(v).toISOString()) , maxTicksLimit: 5 } }, y: { title: { display: !MOBILE, text: "m/min par bpm" } } } },
+  });
+}
+
+// ---------- 2 bis. Durabilité à vélo ----------
+// Part de ta meilleure puissance que tu gardes après une grosse dépense d'énergie (courbes « fatiguées » d'Intervals).
+function rendreDurabilite() {
+  const el = $("#c-durab .xt-corps"); if (!el) return;
+  const R = S.d.durabilite, secs = R?.secs || [];
+  const i5 = secs.indexOf(300), i20 = secs.indexOf(1200);
+  if (!R || !(R.frais || []).length || i20 < 0) { el.innerHTML = `<p class="muted">Pas encore de données : il faut des sorties vélo avec capteur de puissance sur les 6 derniers mois.</p>`; return; }
+  const kj = R.apres_kj ? `${nf(R.apres_kj)} kJ` : "une grosse dépense";
+  // Meilleure puissance sur une période (âge de la sortie en jours, entre j0 exclu et j1 inclus)
+  const meilleur = (L, i, j0, j1) => { const v = (L || []).filter((c) => { const a = D.diff(S.today, c.date); return a >= j0 && a < j1; }).map((c) => c.watts?.[i]).filter((w) => w > 0); return v.length ? Math.max(...v) : null; };
+  const part = (i, j0, j1) => { const f = meilleur(R.frais, i, j0, j1), g = meilleur(R.fatigue, i, j0, j1); return f && g ? { f, g, pct: (g / f) * 100 } : { f, g, pct: null }; };
+  const a20 = part(i20, 0, 90), a5 = i5 >= 0 ? part(i5, 0, 90) : { pct: null }, avant20 = part(i20, 90, 181);
+  const sorties = (R.fatigue || []).filter((c) => c.watts?.[i20] > 0 && D.diff(S.today, c.date) < 90);
+  if (a20.pct == null) {
+    el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">20 MIN FRAIS</span><b>${a20.f ? nf(a20.f) + " W" : "–"}</b><small>90 derniers jours</small></div><div><span class="mono-lab">APRÈS ${esc(kj.toUpperCase())}</span><b>–</b><small>aucune mesure</small></div><div><span class="mono-lab">CONSERVÉ</span><b>–</b><small>&nbsp;</small></div></div>
+      ${xtVerdict(`Aucune sortie des 90 derniers jours ne contient 20 min d'effort soutenu <b>après ${esc(kj)}</b>. Pour mesurer ta durabilité, termine une sortie longue par un bloc de 20 min au seuil.`)}`;
+    return;
+  }
+  const ton = a20.pct >= 95 ? "" : a20.pct >= 90 ? "" : "att";
+  const niveau = a20.pct >= 95 ? "très bonne" : a20.pct >= 90 ? "bonne" : "à travailler";
+  const tend = avant20.pct == null ? "" : a20.pct > avant20.pct + 1.5 ? ` En progrès : <b>${nf(avant20.pct)} %</b> sur les 3 mois précédents.` : a20.pct < avant20.pct - 1.5 ? ` En recul : <b>${nf(avant20.pct)} %</b> sur les 3 mois précédents.` : ` Stable par rapport aux 3 mois précédents (${nf(avant20.pct)} %).`;
+  el.innerHTML = `<div class="xt-duo"><div><span class="mono-lab">20 MIN FRAIS</span><b>${nf(a20.f)} W</b><small>90 derniers jours</small></div><div><span class="mono-lab">APRÈS ${esc(kj.toUpperCase())}</span><b>${nf(a20.g)} W</b><small>${sorties.length} sortie${sorties.length > 1 ? "s" : ""}</small></div><div><span class="mono-lab">CONSERVÉ</span><b class="${ton ? "xt-att" : ""}">${nf(a20.pct)} %</b><small>${a5.pct != null ? `5 min : ${nf(a5.pct)} %` : "&nbsp;"}</small></div></div>
+    <div class="g" style="height:${MOBILE ? 180 : 200}px"><canvas id="g-durab"></canvas></div>
+    ${xtVerdict(`Après ${esc(kj)}, tu gardes <b>${nf(a20.pct)} %</b> de ta meilleure puissance sur 20 min : durabilité <b>${niveau}</b>.${tend}`, ton)}
+    <p class="muted petit">Meilleure puissance sur 20 min des 90 derniers jours, toutes sorties confondues, comparée à la meilleure réalisée après ${esc(kj)} de travail. Repère : une baisse d'environ 10 % est courante chez des cyclistes entraînés. Le seuil de kJ se règle dans Intervals.icu. Chaque point du graphique est une sortie.</p>`;
+  const pt = (c) => ({ x: D.parse(c.date).getTime(), y: c.watts[i20] });
+  const tous = (R.fatigue || []).filter((c) => c.watts?.[i20] > 0).map(pt);
+  const xs = tous.map((p) => p.x);
+  graph("g-durab", { type: "scatter",
+    data: { datasets: [
+      { label: `20 min après ${kj}`, data: tous, backgroundColor: C.orange, pointRadius: 5 },
+      { label: "Meilleur 20 min frais", type: "line", data: xs.length ? [{ x: Math.min(...xs), y: a20.f }, { x: Math.max(...xs), y: a20.f }] : [], borderColor: "#3b6cf0", borderDash: [6, 4], borderWidth: 2, pointRadius: 0 },
+    ] },
+    options: { interaction: { mode: "nearest", intersect: true }, scales: { x: { type: "linear", ticks: { callback: (v) => D.court(new Date(v).toISOString()), maxTicksLimit: 5 } }, y: { title: { display: !MOBILE, text: "W sur 20 min" } } } },
   });
 }
 
@@ -4463,7 +4501,7 @@ const _obsGraphs = "IntersectionObserver" in window ? new IntersectionObserver((
 }, { threshold: 0.35 }) : null;
 
 // ---------- Branchement dans le rendu ----------
-RENDUS.push(rendreJauge, rendreRpe, rendreBrick, rendreDplus, rendreChaleur, rendreHero, () => { marquerChoix(); rendreComparaison(); });
+RENDUS.push(rendreJauge, rendreRpe, rendreBrick, rendreDurabilite, rendreDplus, rendreChaleur, rendreHero, () => { marquerChoix(); rendreComparaison(); });
 let _graphsAnimes = null;
 apresRendu = (function (orig) {
   return function () {
