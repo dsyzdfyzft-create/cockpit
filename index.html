@@ -248,6 +248,14 @@ a.btn { text-decoration: none; color: inherit; }
 .s-nom { font-size: 0.95rem; margin-top: 3px; line-height: 1.25; overflow-wrap: anywhere; }
 .s-m { font-size: 11.5px; color: #2e3a20; margin-top: 3px; font-weight: 500; }
 .s-p { font: 400 11px var(--mono); color: var(--texte3); margin-top: 2px; }
+.s-chaus { display: block; width: fit-content; max-width: 100%; margin-top: 4px; padding: 2px 7px 2px 5px; border-radius: 10px; font: 600 10.5px var(--mono); color: var(--encre); background: var(--piste); border-left: 3px solid var(--cr, var(--doux)); border-radius: 6px; line-height: 1.35; overflow-wrap: anywhere; }
+.s-chaus.reel { opacity: 0.75; }
+.mat-prochaines { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--ligne2); }
+.mat-prochaines .mono-lab { display: block; margin-bottom: 6px; }
+.mat-p { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; font-size: 13px; }
+.mat-p .mono { flex: none; width: 72px; font-size: 11.5px; color: var(--texte2); }
+.mat-p .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mat-p .s-chaus { margin-top: 0; flex: none; white-space: nowrap; }
 .jours.compact .s-nom, .jours.compact .s-p { display: none; }
 
 /* Accès */
@@ -1255,7 +1263,8 @@ function rendreDecision() {
   if (!s) { el.innerHTML = `<p class="muted">Aucun rapport matinal pour l'instant : il apparaîtra après ta prochaine nuit enregistrée.</p>`; return; }
   const titre = s.alert ? "Journée facile conseillée" : s.recovery >= 67 ? "Feu vert pour une séance intense" : s.recovery >= 34 ? "Séance modérée aujourd'hui" : "Journée de récupération";
   const prevuTxt = prevus.length
-    ? `Prévu : <b>${prevus.map((p) => esc(p.nom) + (p.duree_s ? ` (${dureeFmt(p.duree_s)})` : "")).join(" + ")}</b>${s.conseil ? `, ${esc(s.conseil)}` : ""}.`
+    ? `Prévu : <b>${prevus.map((p) => esc(p.nom) + (p.duree_s ? ` (${dureeFmt(p.duree_s)})` : "")).join(" + ")}</b>${s.conseil ? `, ${esc(s.conseil)}` : ""}.` +
+      prevus.filter((p) => chaussureDe(p.description)).map((p) => ` 👟 <b>${esc(chaussureDe(p.description))}</b>`).join("")
     : `Rien de prévu dans Intervals.${s.cible ? ` Cible du jour : ${esc(s.cible)}.` : ""}`;
   el.innerHTML = `
     ${s.alert ? `<p class="alerte">Signaux inhabituels deux nuits de suite (FC de repos, HRV)</p>` : ""}
@@ -2444,7 +2453,8 @@ function carteSeance({ e, a }, jour) {
     <div class="s-nom">${esc(e?.nom || a?.nom)}</div>
     ${a ? `<div class="s-m mono">${dureeFmt(a.duree_s)}${a.distance_m ? " · " + dist(a.distance_m) : ""}</div>` : ""}
     ${e && a && e.duree_s ? `<div class="s-p">· prévu ${dureeFmt(e.duree_s)}</div>` : ""}
-    ${!a && e?.description ? `<div class="s-p">${esc(e.description.split("\n")[0]).slice(0, 70)}</div>` : ""}
+    ${pastilleChaussure(e, a)}
+    ${!a && e?.description && sansChaussure(e.description) ? `<div class="s-p">${esc(sansChaussure(e.description).split("\n")[0]).slice(0, 70)}</div>` : ""}
   </div>`;
 }
 
@@ -3388,7 +3398,34 @@ function rendreMateriel() {
       <div class="barre"><i style="width:${Math.min(100, pct)}%;background:${coul}"></i></div>
       <div class="muted petit mat-s">${esc(info)}${conseil ? ` · <span style="color:${coul}">${conseil}</span>` : ""}</div>
     </div>`;
-  }).join("");
+  }).join("") + prochainesSorties();
+}
+
+// Paire notée en tête de description (« 👟 Adidas Evo SL »), posée par le connecteur Cockpit
+const chaussureDe = (desc) => { const m = /^\s*👟\s*(.+?)\s*$/mu.exec(String(desc ?? "")); return m ? m[1] : null; };
+const sansChaussure = (desc) => String(desc ?? "").replace(/^\s*👟.*$/gmu, "").replace(/^\n+/, "");
+const COUL_ROLE = { quotidien: "#3b6cf0", competition: "#e8853a", trail: "#3faa6f" };
+const paireParNom = (nom) => (S.d.materiel ?? []).find((p) => p.nom.toLowerCase() === String(nom).toLowerCase());
+const nomCourt = (nom) => String(nom).replace(/^(adidas|asics|nike|hoka|saucony|new balance|brooks|puma|on|mizuno|salomon)\s+/i, "");
+function pastilleChaussure(e, a, avecMarque = false) {
+  let nom = null, reel = false;
+  if (a) { // séance faite : paire réellement attribuée
+    const u = (S.d.materiel_usage ?? []).find((x) => String(x.activity_id) === String(a.id));
+    const p = u && (S.d.materiel ?? []).find((x) => x.id === u.materiel_id);
+    if (p) { nom = p.nom; reel = true; }
+  } else if (e) nom = chaussureDe(e.description);
+  if (!nom) return "";
+  const p = paireParNom(nom);
+  return `<span class="s-chaus${reel ? " reel" : ""}" style="--cr:${COUL_ROLE[p?.role] ?? C.doux}" title="${reel ? "Portées" : "À chausser"} : ${esc(nom)}">👟 ${esc(avecMarque ? nom : nomCourt(nom))}</span>`;
+}
+// Les 14 prochains jours de course, avec la paire prévue
+function prochainesSorties() {
+  const L = (S.evts ?? []).filter((e) => e.categorie === "WORKOUT" && /run/i.test(e.sport) && e.date >= S.today && e.date <= D.add(S.today, 14))
+    .sort((x, y) => (x.date + (x.heure ?? "")).localeCompare(y.date + (y.heure ?? "")));
+  if (!L.length) return "";
+  return `<div class="mat-prochaines"><span class="mono-lab">Prochaines sorties</span>${L.map((e) => `
+    <div class="mat-p"><span class="mono">${e.date === S.today ? "AUJ." : D.fmt(e.date, { weekday: "short", day: "numeric" }).replace(".", "")}</span>
+      <span class="nom">${esc(e.nom)}</span>${pastilleChaussure(e, null) || `<span class="muted petit">pas de paire</span>`}</div>`).join("")}</div>`;
 }
 
 function rendreLienTelegram() {
