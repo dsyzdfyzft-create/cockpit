@@ -857,6 +857,7 @@ h2.sec { font-size: 1.2rem; letter-spacing: -0.02em; margin: 30px 2px 12px; font
         <div class="carte"><div class="carte-titre"><h3>Météo</h3></div><div id="c-meteo"></div></div>
         <div class="carte"><div class="carte-titre"><h3>Séances récentes</h3></div><div class="journal" id="c-log"></div></div>
         <div class="carte"><div class="carte-titre"><h3>Matériel</h3></div><div id="c-materiel"></div></div>
+        <div class="carte"><div class="carte-titre"><h3>Enchaînements &amp; ressenti</h3></div><div id="c-briques"></div></div>
       </div>
     </section>
 
@@ -2536,7 +2537,7 @@ async function charger() {
 const RENDUS = [rendreEntete, rendreKpis, rendreDecision, rendreReadiness, rendreDrapeau, rendreEquilibre, rendreZones, rendreJournal,
   rendreGlissant, rendrePmc, rendreVolume, rendreAllure, rendreEfficacite, rendreRepartition, rendreZonesRep, rendrePuissance,
   rendreBienEtre, rendreDeuxHrv, rendrePoids, rendreCourse, rendreArc, rendrePlan,
-  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel];
+  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel, rendreBriquesRessenti];
 
 function toutRendre() {
   if (!S.d) return;
@@ -3393,22 +3394,62 @@ function fermerModal() { const m = $("#modal-evt"); if (m) m.hidden = true; }
 // ============================================================
 function rendreMateriel() {
   const el = $("#c-materiel"); if (!el) return;
-  const L = (S.d.materiel ?? []).filter((p) => p.actif)
-    .sort((a, b) => (a.sport + a.role).localeCompare(b.sport + b.role) || b.pct - a.pct);
-  if (!L.length) { el.innerHTML = `<p class="muted pad">Aucune paire suivie pour l'instant.</p>`; return; }
-  const ROLE = { quotidien: "Quotidien", competition: "Compétition", trail: "Trail" };
-  const kms = (km) => (U() === "km" ? `${nf(km)} km` : `${nf(km / 1.60934)} mi`);
+  const tous = (S.d.materiel ?? []).filter((p) => p.actif);
+  // Vélos et paires d'abord, chaque pièce sous son vélo
+  const L = tous.filter((p) => !p.parent_id)
+    .sort((a, b) => (a.sport + a.role).localeCompare(b.sport + b.role) || b.pct - a.pct)
+    .flatMap((p) => [p, ...tous.filter((x) => x.parent_id === p.id).sort((a, b) => b.pct - a.pct)]);
+  if (!L.length) { el.innerHTML = `<p class="muted pad">Aucun matériel suivi pour l'instant.</p>`; return; }
+  const ROLE = { quotidien: "Quotidien", competition: "Compétition", trail: "Trail", route: "Route", vtt: "VTT", ht: "Home trainer" };
+  const EMO = { Run: "👟", Ride: "🚲" };
+  const qte = (x, p) => (p.unite === "h" ? `${nf(x)} h` : U() === "km" ? `${nf(x)} km` : `${nf(x / 1.60934)} mi`);
   el.innerHTML = L.map((p) => {
     const pct = Number(p.pct) || 0, coul = pct >= 100 ? C.rouge : pct >= 80 ? C.orange : C.vert;
     const info = [ROLE[p.role] ?? p.role, p.nb_sorties ? `${p.nb_sorties} sortie${p.nb_sorties > 1 ? "s" : ""} suivie${p.nb_sorties > 1 ? "s" : ""}` : null,
       p.derniere_utilisation ? "dernière : " + D.court(p.derniere_utilisation) : null].filter(Boolean).join(" · ");
-    const conseil = pct >= 80 ? (p.role === "competition" ? "Passe-la à l'entraînement." : pct >= 100 ? "Seuil d'usure atteint : à remplacer." : "Pense à prévoir la remplaçante.") : "";
-    return `<div class="mat">
-      <div class="mat-t"><b>👟 ${esc(p.nom)}</b><span class="mono">${kms(p.km_total)} / ${kms(p.km_alerte)} · ${pct} %</span></div>
+    const conseil = pct >= 80 ? (p.sport !== "Run" ? (pct >= 100 ? "Révision ou remplacement à faire." : "Prévois la révision.") : p.role === "competition" ? "Passe-la à l'entraînement." : pct >= 100 ? "Seuil d'usure atteint : à remplacer." : "Pense à prévoir la remplaçante.") : "";
+    // Prévision : rythme des 8 dernières semaines
+    const pv = p.prevision, c = pv?.course;
+    const prev = pv && pv.par_semaine ? [`≈ ${qte(pv.par_semaine, p)}/sem.`, pv.date_seuil && pct < 100 ? `seuil vers le ${pv.date_seuil.slice(0, 4) === S.today.slice(0, 4) ? D.court(pv.date_seuil) : D.fmt(pv.date_seuil, { month: "short", year: "numeric" })}` : null, pv.provisoire ? "estimation provisoire (suivi récent)" : null].filter(Boolean).join(" · ") : "";
+    const alerteCourse = c && p.sport === "Run" && p.role === "competition" && c.pct >= 80;
+    const course = c && p.sport === "Run" && (p.role === "competition" || c.pct >= 80)
+      ? `<div class="petit mat-s" style="color:${c.pct >= 100 ? C.rouge : c.pct >= 80 ? C.orange : "inherit"}">🏁 ${esc(c.nom)} (${D.court(c.date)}) : ~${qte(c.km_prevus, p)}, ${c.pct} %${alerteCourse ? " — prévois une paire neuve à roder avant" : " — OK pour la course"}</div>` : "";
+    const dl = p.douleurs?.douleurs ? `<div class="petit mat-s" style="color:${C.orange}">⚠️ ${p.douleurs.douleurs} note${p.douleurs.douleurs > 1 ? "s" : ""} de douleur sur ${p.douleurs.notes}${Object.keys(p.douleurs.zones).length ? " (" + Object.entries(p.douleurs.zones).map(([z, n]) => `${z}${n > 1 ? " ×" + n : ""}`).join(", ") + ")" : ""}</div>` : "";
+    return `<div class="mat"${p.parent_id ? ' style="margin-left:18px"' : ""}>
+      <div class="mat-t"><b>${p.parent_id ? "🔧" : EMO[p.sport] ?? "🔧"} ${esc(p.nom)}</b><span class="mono">${qte(p.km_total, p)} / ${qte(p.km_alerte, p)} · ${pct} %</span></div>
       <div class="barre"><i style="width:${Math.min(100, pct)}%;background:${coul}"></i></div>
-      <div class="muted petit mat-s">${esc(info)}${conseil ? ` · <span style="color:${coul}">${conseil}</span>` : ""}</div>
+      <div class="muted petit mat-s">${esc(info)}${prev ? " · " + prev : ""}${conseil ? ` · <span style="color:${coul}">${conseil}</span>` : ""}</div>
+      ${course}${dl}
     </div>`;
   }).join("") + prochainesSorties();
+}
+
+// Enchaînements vélo → course et charge ressentie (calculés par le serveur)
+function rendreBriquesRessenti() {
+  const el = $("#c-briques"); if (!el) return;
+  const E = S.d.enchainements, R = S.d.charge_ressentie;
+  const sg = (x) => (x == null ? "–" : `${x > 0 ? "+" : ""}${nf(x)} %`);
+  const coulEcart = (x) => (x == null ? "" : x <= -8 ? C.rouge : x <= -4 ? C.orange : C.vert);
+  let h = `<span class="mono-lab">Enchaînements vélo → course</span>`;
+  if (!E?.nb) h += `<p class="muted petit">Aucune course démarrée dans les 20 min après un vélo sur les 6 derniers mois.</p>`;
+  else {
+    const tendance = E.ecart_avant_pct != null && E.ecart_recent_pct != null ? (E.ecart_recent_pct > E.ecart_avant_pct + 1 ? "en progrès ↗" : E.ecart_recent_pct < E.ecart_avant_pct - 1 ? "en recul ↘" : "stable") : "";
+    h += `<p class="petit">Efficacité après le vélo : <b style="color:${coulEcart(E.ecart_recent_pct)}">${sg(E.ecart_recent_pct)}</b> sur les 4 derniers enchaînements${E.ecart_avant_pct != null ? `, contre ${sg(E.ecart_avant_pct)} avant (${tendance})` : ""}.</p>
+      <table class="tab"><thead><tr><th>Date</th><th>Course</th><th>Allure</th><th>FC</th><th>Écart</th></tr></thead><tbody>${E.seances.map((s) =>
+        `<tr><td class="mono">${D.court(s.date)}</td><td>${esc(s.nom)} <span class="muted">${s.duree_min} min</span></td><td class="mono">${allure(1000 / s.allure_s_km)}</td><td class="mono">${s.fc ?? "–"}</td><td class="mono" style="color:${coulEcart(s.ecart_pct)}">${sg(s.ecart_pct)}</td></tr>`).join("")}</tbody></table>`;
+  }
+  h += `<span class="mono-lab" style="margin-top:14px;display:block">Charge ressentie (RPE × min) / TSS</span>`;
+  if (!R || R.base_ratio == null) h += `<p class="muted petit">${esc(R?.signal ?? "pas assez de séances notées")} : il faut 3 semaines de référence, avec au moins 3 séances notées sur Telegram chacune.</p>`;
+  else {
+    const coul = R.ecart_pct > 20 ? C.rouge : R.ecart_pct > 10 ? C.orange : R.ecart_pct < -20 ? C.orange : C.vert;
+    const max = Math.max(...R.semaines.map((s) => s.ratio ?? 0), R.base_ratio * 1.3);
+    h += `<p class="petit"><b style="color:${coul}">${esc(R.signal)}</b> : ${R.ratio_2_semaines.toFixed(1).replace(".", ",")} sur 2 semaines pour ${R.base_ratio.toFixed(1).replace(".", ",")} d'habitude (${sg(R.ecart_pct)}).</p>
+      <div style="display:flex;gap:4px;align-items:flex-end;height:70px">${R.semaines.map((s) =>
+        `<div title="Semaine du ${D.court(s.semaine)} : ${s.seances} séances notées${s.ratio != null ? ", ratio " + nf(s.ratio) : ""}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%">
+          <i style="display:block;height:${s.ratio != null ? Math.max(4, (70 * s.ratio) / max) : 2}px;background:${s.ratio == null ? "var(--ligne2)" : s.ratio > R.base_ratio * 1.2 ? C.rouge : C.doux};border-radius:3px 3px 0 0"></i></div>`).join("")}</div>
+      <div class="muted petit mono" style="display:flex;justify-content:space-between"><span>${D.court(R.semaines[0].semaine)}</span><span>cette sem.</span></div>`;
+  }
+  el.innerHTML = h + `<p class="muted petit">${esc(E?.note ?? "")} ${esc(R?.note ?? "")}</p>`;
 }
 
 // Paire notée en tête de description (« 👟 Adidas Evo SL »), posée par le connecteur Cockpit
