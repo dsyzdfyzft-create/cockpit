@@ -13,10 +13,11 @@
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cockpit · athlète</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏊</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230e1013'/><text x='50' y='68' font-size='54' text-anchor='middle' fill='%23c6ef5c' font-family='monospace' font-weight='700'>V</text></svg>">
+<link rel="preconnect" href="https://api.fontshare.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=general-sans@500,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
   // Sur un téléphone, ouvre directement la version iPhone (sauf si ?ordi est dans l'adresse)
@@ -26,11 +27,12 @@
 :root {
   --fond: #ffffff; --encre: #0f1115; --doux: #6b7280; --ligne: #e7e8eb; --clair: #f6f7f8;
   --surface: #ffffff; --piste: #eceef0; --texte2: #4b5058; --lab: #55595f; --texte3: #8a8f98; --texte4: #b9bdc4; --ligne2: #d5d8dd; --sur-encre: #ffffff; --verre: rgba(255,255,255,0.92);
-  --velo: #3f8f80; --course: #3b5fe0; --natation: #4a9ab6; --marche: #7c3aed; --autre-sport: #9aa0a6;
+  --velo: #3f8f80; --course: #3b5fe0; --natation: #4a9ab6; --marche: #7c3aed; --autre-sport: #9aa0a6; --accent: #3b6cf0;
 
   --marine: #1d2538; --lime: #c6ef5c; --vert: #3faa6f; --orange: #e8853a; --rouge: #e0483e;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --titre: "General Sans", "Satoshi", -apple-system, system-ui, sans-serif;
+  --sans: "Satoshi", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -130,7 +132,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Journal */
 .act { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 34px 1fr 16px; gap: 14px; align-items: start; width: 100%; padding: 14px 10px; border-radius: 6px; cursor: pointer; }
 .act:hover, .act.ouvert { background: var(--clair); }
-.act:focus-visible { outline: 2px solid #3b6cf0; }
+.act:focus-visible { outline: 2px solid var(--accent); }
 .ico { width: 30px; height: 30px; margin-top: 2px; }
 .ico svg { width: 100%; height: 100%; }
 .act-c { min-width: 0; }
@@ -225,7 +227,7 @@ a.btn { text-decoration: none; color: inherit; }
 .course h2 { font-size: clamp(30px, 4vw, 46px); letter-spacing: -0.03em; margin: 14px 0 6px; font-weight: 700; }
 .r-sous { color: #b9bec8; font-size: 13px; letter-spacing: 0.06em; }
 .r-prochaine { margin-top: 22px; padding-top: 16px; border-top: 1px solid #2a2e35; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; position: relative; z-index: 1; }
-.r-prochaine .mono-lab { color: #9aa0a6; }
+.r-prochaine .mono-lab { color: var(--texte3); }
 .r-prochaine span:last-child { color: #b9bec8; }
 .arc-stats { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; color: var(--texte2); margin-bottom: 10px; }
 .arc-stats b { color: var(--encre); }
@@ -253,7 +255,7 @@ a.btn { text-decoration: none; color: inherit; }
 .s-duree { font: 400 11px var(--mono); color: var(--doux); }
 .sb { font: 600 9.5px var(--mono); padding: 2px 5px; border-radius: 3px; letter-spacing: 0.04em; }
 .b-done { background: #d8f0b8; color: #2f5a0e; }
-.b-over { background: #3b6cf0; color: #fff; }
+.b-over { background: var(--accent); color: #fff; }
 .b-part { background: #fde9a8; color: #7a5a00; }
 .b-hors { background: var(--orange); color: #fff; }
 .b-manque { background: #f3d4d1; color: #a3261c; }
@@ -284,7 +286,7 @@ a.btn { text-decoration: none; color: inherit; }
 .tags { align-items: center; flex-wrap: wrap; }
 .r-form { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 18px; padding: 16px; background: #181b20; border: 1px solid #2a2e35; border-radius: 6px; }
 .r-form[hidden] { display: none; }
-.r-form label { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; color: #9aa0a6; }
+.r-form label { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; color: var(--texte3); }
 .r-form input, .r-form select { font: 500 15px var(--sans); color: #fff; background: #0e1013; border: 1px solid #3a3f48; border-radius: 5px; padding: 9px 10px; color-scheme: dark; }
 .r-aide, .r-msg { grid-column: 1 / -1; margin: 0; color: #b9bec8; font-size: 0.86rem; }
 .r-msg { color: #f4b183; }
@@ -296,21 +298,21 @@ a.btn { text-decoration: none; color: inherit; }
 /* Courses B et C */
 .r-courses { position: relative; z-index: 1; margin-top: 20px; padding-top: 14px; border-top: 1px solid #2a2e35; }
 .r-c-tete { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
-.r-c-tete .mono-lab { color: #9aa0a6; }
+.r-c-tete .mono-lab { color: var(--texte3); }
 .r-c-tete .r-modif { margin-left: 0; }
 .r-c { display: grid; grid-template-columns: auto 1fr auto auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid #22262c; }
 .r-c-nom b { display: block; font-weight: 600; }
-.r-c-nom small { color: #9aa0a6; }
+.r-c-nom small { color: var(--texte3); }
 .r-c-date { color: #b9bec8; font-size: 12.5px; }
 .r-suppr { background: transparent; border: 0; color: #6b7280; font-size: 15px; padding: 4px 6px; }
 .r-suppr:hover { color: #fff; }
-.r-vide { color: #8a8f98; font-size: 0.88rem; margin: 6px 0 0; }
+.r-vide { color: var(--texte3); font-size: 0.88rem; margin: 6px 0 0; }
 .tag-b, .tag-c { font: 700 11px var(--mono); padding: 4px 8px; border-radius: 4px; }
 .tag-b { background: #e8853a; color: #fff; }
 .tag-c { background: #3a3f48; color: #dfe3ea; }
 .seance.s-course { border-left-color: var(--encre); background: #f1f9de; }
 .seance.s-course.p-B { border-left-color: #e8853a; background: #fdf0e4; }
-.seance.s-course.p-C { border-left-color: #8a8f98; background: var(--clair); }
+.seance.s-course.p-C { border-left-color: var(--texte3); background: var(--clair); }
 .s-course .s-sport { color: var(--encre); }
 @media (max-width: 640px) { .r-c { grid-template-columns: auto 1fr auto; } .r-c-date { grid-column: 2; grid-row: 2; } }
 
@@ -343,7 +345,7 @@ a.btn { text-decoration: none; color: inherit; }
 .pred-total b { display: block; font-size: 40px; letter-spacing: -.03em; margin: 2px 0; }
 .pred-total small { color: #c6cbd6; }
 .pred-reglages { margin-top: 14px; }
-.pred-reglages summary { cursor: pointer; color: #3b6cf0; font-weight: 500; margin-bottom: 12px; }
+.pred-reglages summary { cursor: pointer; color: var(--accent); font-weight: 500; margin-bottom: 12px; }
 .calc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: end; max-width: 760px; }
 .calc label { display: flex; flex-direction: column; gap: 5px; font: 500 11px var(--mono); letter-spacing: .04em; color: var(--lab); text-transform: uppercase; }
 .calc input { font-family: var(--mono); font-size: 20px; }
@@ -365,20 +367,20 @@ a.btn { text-decoration: none; color: inherit; }
 .saison-resume b { display: block; font-size: 24px; letter-spacing: -.02em; margin: 2px 0; }
 .saison-resume small { color: var(--doux); }
 .saison-leg { margin: 0 0 14px; align-items: center; }
-.leg-prevu { width: 12px !important; height: 12px !important; background: #8fb0f3; opacity: .55; outline: 1px dashed #3b6cf0; border-radius: 3px; }
+.leg-prevu { width: 12px !important; height: 12px !important; background: #8fb0f3; opacity: .55; outline: 1px dashed var(--accent); border-radius: 3px; }
 .leg-prev { width: 12px !important; height: 12px !important; background: #8fb0f3; opacity: .28; border-radius: 3px; }
 .leg-exam { width: 12px !important; height: 12px !important; border-radius: 3px; background: repeating-linear-gradient(45deg, #e8853a 0 2px, #fff 2px 5px); }
 .cj { all: unset; box-sizing: border-box; position: relative; display: block; width: 100%; aspect-ratio: 1; border-radius: 3px; cursor: pointer; }
-.cj.prevu { outline: 1px dashed #3b6cf0; outline-offset: -1px; }
+.cj.prevu { outline: 1px dashed var(--accent); outline-offset: -1px; }
 .cj.exam::after { content: ""; position: absolute; inset: 0; border-radius: 3px; background: repeating-linear-gradient(45deg, rgba(232,133,58,.75) 0 2px, transparent 2px 5px); }
 .cj.auj { outline: 2px solid var(--encre); outline-offset: 0; }
 .cj.choisi { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px #e8853a; }
-.cj:focus-visible { box-shadow: 0 0 0 2px #3b6cf0; }
+.cj:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
 .cj-c { position: absolute; inset: 0; display: grid; place-items: center; font: 700 10px var(--mono); color: var(--encre); z-index: 1; }
 .cj-c::before { content: ""; position: absolute; inset: 2px; border-radius: 50%; border: 2px solid var(--encre); background: var(--surface); z-index: -1; }
 .cj-c.p-A::before { background: var(--lime); }
 .cj-c.p-B::before { border-color: #e8853a; }
-.cj-c.p-C::before { border-color: #8a8f98; }
+.cj-c.p-C::before { border-color: var(--texte3); }
 .saison-h { display: grid; grid-template-columns: 26px repeat(var(--n), minmax(16px, 1fr)); gap: 3px; min-width: calc(var(--n) * 19px + 30px); }
 .saison-h .sm { font: 500 10.5px var(--mono); color: var(--lab); white-space: nowrap; text-transform: uppercase; }
 .saison-h .sp { height: 5px; border-radius: 2px; margin-bottom: 2px; }
@@ -398,7 +400,7 @@ a.btn { text-decoration: none; color: inherit; }
 .sd b { text-transform: capitalize; }
 .sd-l { margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .exams .ex { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
-.exams .r-suppr { color: #9aa0a6; }
+.exams .r-suppr { color: var(--texte3); }
 
 .gpx-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 6px; }
 .gpx-btn { cursor: pointer; }
@@ -451,7 +453,7 @@ a.btn { text-decoration: none; color: inherit; }
 .cg-v { font: 600 11px "JetBrains Mono", monospace; fill: #1f45c4; }
 
 .pdc-tab { margin-top: 10px; }
-.pdc-tab summary { cursor: pointer; color: #3b6cf0; font-weight: 500; }
+.pdc-tab summary { cursor: pointer; color: var(--accent); font-weight: 500; }
 .pdc-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-top: 10px; }
 .pdc-grille > div { background: var(--clair); border-radius: 5px; padding: 7px 9px; }
 .pdc-grille span { display: block; color: var(--doux); font-size: .78rem; }
@@ -539,7 +541,7 @@ a.btn { text-decoration: none; color: inherit; }
 .cadre { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100vh; }
 .lateral { background: #0e1013; color: #d7dbe2; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
 .marque { display: flex; align-items: center; gap: 12px; padding: 26px 22px; border-bottom: 1px solid #1d2026; font-weight: 600; color: #fff; font-size: 1.12rem; }
-.marque span { color: #8a9099; font-weight: 400; }
+.marque span { color: var(--texte3); font-weight: 400; }
 .logo { width: 30px; height: 30px; border-radius: 7px; background: #2a2e35; display: grid; place-items: center; color: var(--lime); font: 700 15px var(--mono); }
 .nav { padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
 .nav button { all: unset; display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 6px; color: #c3c8d0; font-size: 1.02rem; cursor: pointer; border-left: 3px solid transparent; }
@@ -547,11 +549,11 @@ a.btn { text-decoration: none; color: inherit; }
 .nav button.on { background: #1f2329; color: #fff; border-left-color: var(--lime); }
 .nav button:focus-visible { outline: 2px solid var(--lime); }
 .nav .sous-nav { margin: 2px 0 8px 36px; display: flex; flex-direction: column; }
-.nav .sous-nav a { color: #8a9099; text-decoration: none; padding: 5px 0; font-size: 0.9rem; }
+.nav .sous-nav a { color: var(--texte3); text-decoration: none; padding: 5px 0; font-size: 0.9rem; }
 .nav .sous-nav a:hover { color: #fff; }
 .lat-bas { margin-top: auto; padding: 18px 20px; border-top: 1px solid #1d2026; display: flex; gap: 12px; align-items: center; }
 .avatar { width: 34px; height: 34px; border-radius: 50%; background: #b8325a; color: #fff; display: grid; place-items: center; font-weight: 600; }
-.lat-bas small { display: block; color: #8a9099; }
+.lat-bas small { display: block; color: var(--texte3); }
 main { padding: 44px 48px 60px; max-width: 1320px; width: 100%; min-width: 0; }
 .entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }
 .entete h1 { font-size: 2.3rem; letter-spacing: -0.03em; margin: 0; font-weight: 700; }
@@ -666,7 +668,7 @@ h2.sec { font-size: 1.6rem; letter-spacing: -0.02em; margin: 54px 0 0; padding-b
 .xt-j-v b { font-size: 1.35rem; } .xt-j-v span { font-size: 0.82rem; }
 .xt-j-b { height: 7px; border-radius: 4px; background: var(--piste); overflow: hidden; }
 .xt-j-b i { display: block; height: 100%; border-radius: 4px; transition: width .8s ease; }
-.xt-reglages { margin-top: 12px; } .xt-reglages summary { cursor: pointer; color: #3b6cf0; font-weight: 500; }
+.xt-reglages { margin-top: 12px; } .xt-reglages summary { cursor: pointer; color: var(--accent); font-weight: 500; }
 .xt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 12px 0 6px; align-items: end; }
 .xt-form label { display: flex; flex-direction: column; gap: 5px; font: 500 11px var(--mono); letter-spacing: .04em; color: var(--lab); text-transform: uppercase; }
 .xt-form input { font: 500 15px var(--sans); border: 1px solid var(--ligne); border-radius: 6px; padding: 8px 10px; background: var(--surface); color: var(--encre); }
@@ -691,8 +693,8 @@ h2.sec { font-size: 1.6rem; letter-spacing: -0.02em; margin: 54px 0 0; padding-b
 .xt-pal-res button span { color: var(--doux); font-size: .85rem; white-space: nowrap; }
 .xt-pal-res button.on, .xt-pal-res button:hover { background: var(--clair); }
 .xt-pal-pied { display: flex; gap: 16px; padding: 9px 16px; border-top: 1px solid var(--ligne); font-size: 11px; color: var(--texte3); }
-.xt-cherche { margin-top: 10px; color: #8a9099 !important; }
-.xt-cherche kbd { margin-left: auto; font: 500 11px var(--mono); border: 1px solid #2a2e35; border-radius: 4px; padding: 1px 6px; color: #8a9099; }
+.xt-cherche { margin-top: 10px; color: var(--texte3) !important; }
+.xt-cherche kbd { margin-left: auto; font: 500 11px var(--mono); border: 1px solid #2a2e35; border-radius: 4px; padding: 1px 6px; color: var(--texte3); }
 .xt-flash { animation: xtflash 1.5s ease; }
 @keyframes xtflash { 0%, 40% { box-shadow: 0 0 0 3px var(--lime); } 100% { box-shadow: 0 0 0 0 transparent; } }
 /* Bilan */
@@ -710,9 +712,9 @@ h2.sec { font-size: 1.6rem; letter-spacing: -0.02em; margin: 54px 0 0; padding-b
 .hero-jn { font: 700 clamp(64px, 12vw, 148px)/0.9 var(--mono); letter-spacing: -0.06em; color: var(--lime); }
 .hero-date { color: #b9bec8; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; padding-bottom: 10px; line-height: 1.6; }
 .hero-ctl { margin-top: 22px; position: relative; z-index: 1; max-width: 560px; }
-.hero-ctl-t { display: flex; justify-content: space-between; font-size: 11px; color: #9aa0a6; letter-spacing: .06em; margin-bottom: 6px; }
+.hero-ctl-t { display: flex; justify-content: space-between; font-size: 11px; color: var(--texte3); letter-spacing: .06em; margin-bottom: 6px; }
 .hero-barre { height: 8px; border-radius: 4px; background: #22262c; overflow: hidden; }
-.hero-barre i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #3b6cf0, var(--lime)); }
+.hero-barre i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--lime)); }
 #o-outils > .hero-course { margin: 0 0 14px; padding: 22px 20px; }
 @media (max-width: 1250px) { .xt-jauge { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .xt-jauge { grid-template-columns: 1fr 1fr; gap: 8px; } .xt-j { padding: 10px; } .xt-duo { gap: 6px; } .xt-duo > div { padding: 8px; } .xt-duo b { font-size: 1rem; } .cmp-z { grid-template-columns: 1fr; } }
@@ -769,6 +771,8 @@ h2.sec { font-size: 1.6rem; letter-spacing: -0.02em; margin: 54px 0 0; padding-b
   body.xt-impression #c-fiche { position: absolute; left: 0; top: 0; width: 100%; border: 0; background: #fff !important; color: #000 !important; }
   body.xt-impression [data-imprimer-fiche] { display: none; }
 }
+h1, h2, h3, .marque { font-family: var(--titre); }
+.ico { width: 1em; height: 1em; vertical-align: -0.14em; flex: none; }
 </style>
 </head>
 <body>
@@ -980,6 +984,9 @@ const somme = (a) => a.reduce((s, x) => s + (x || 0), 0);
 // ---------- Couleurs ----------
 const SOMBRE = document.documentElement.dataset.theme === "dark";
 // Palette unique : lue dans les variables CSS (:root), pour que graphiques et pages aient les mêmes couleurs
+// Icônes Lucide (ISC), une seule famille au même trait
+const ICO = {"bed": "<path d=\"M2 4v16\" /> <path d=\"M2 8h18a2 2 0 0 1 2 2v10\" /> <path d=\"M2 17h20\" /> <path d=\"M6 8v9\" />", "bike": "<circle cx=\"18.5\" cy=\"17.5\" r=\"3.5\" /> <circle cx=\"5.5\" cy=\"17.5\" r=\"3.5\" /> <circle cx=\"15\" cy=\"5\" r=\"1\" /> <path d=\"M12 17.5V14l-3-3 4-3 2 3h2\" />", "book-open": "<path d=\"M12 7v14\" /> <path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\" />", "coffee": "<path d=\"M10 2v2\" /> <path d=\"M14 2v2\" /> <path d=\"M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1\" /> <path d=\"M6 2v2\" />", "flag": "<path d=\"M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z\" /> <line x1=\"4\" x2=\"4\" y1=\"22\" y2=\"15\" />", "footprints": "<path d=\"M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z\" /> <path d=\"M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z\" /> <path d=\"M16 17h4\" /> <path d=\"M4 13h4\" />", "map-pin": "<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /> <circle cx=\"12\" cy=\"10\" r=\"3\" />", "medal": "<path d=\"M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15\" /> <path d=\"M11 12 5.12 2.2\" /> <path d=\"m13 12 5.88-9.8\" /> <path d=\"M8 7h8\" /> <circle cx=\"12\" cy=\"17\" r=\"5\" /> <path d=\"M12 18v-2h-.5\" />", "person-standing": "<circle cx=\"12\" cy=\"5\" r=\"1\" /> <path d=\"m9 20 3-6 3 6\" /> <path d=\"m6 8 6 2 6-2\" /> <path d=\"M12 10v4\" />", "smartphone": "<rect width=\"14\" height=\"20\" x=\"5\" y=\"2\" rx=\"2\" ry=\"2\" /> <path d=\"M12 18h.01\" />", "snowflake": "<line x1=\"2\" x2=\"22\" y1=\"12\" y2=\"12\" /> <line x1=\"12\" x2=\"12\" y1=\"2\" y2=\"22\" /> <path d=\"m20 16-4-4 4-4\" /> <path d=\"m4 8 4 4-4 4\" /> <path d=\"m16 4-4 4-4-4\" /> <path d=\"m8 20 4-4 4 4\" />", "triangle-alert": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /> <path d=\"M12 9v4\" /> <path d=\"M12 17h.01\" />", "utensils": "<path d=\"M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2\" /> <path d=\"M7 2v20\" /> <path d=\"M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7\" />", "wine": "<path d=\"M8 22h8\" /> <path d=\"M7 10h10\" /> <path d=\"M12 15v7\" /> <path d=\"M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z\" />", "wrench": "<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z\" />"};
+const ico = (n) => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]}</svg>`;
 const _v = (n, d) => (getComputedStyle(document.documentElement).getPropertyValue(n).trim() || d);
 const C = {
   encre: _v("--encre", "#0f1115"), doux: _v("--doux", "#6b7280"), ligne: _v("--ligne", "#e7e8eb"), grille: SOMBRE ? "#1d2127" : "#f0f1f3",
@@ -1279,7 +1286,7 @@ function rendreDecision() {
   const titre = s.alert ? "Journée facile conseillée" : s.recovery >= 67 ? "Feu vert pour une séance intense" : s.recovery >= 34 ? "Séance modérée aujourd'hui" : "Journée de récupération";
   const prevuTxt = prevus.length
     ? `Prévu : <b>${prevus.map((p) => esc(p.nom) + (p.duree_s ? ` (${dureeFmt(p.duree_s)})` : "")).join(" + ")}</b>${s.conseil ? `, ${esc(s.conseil)}` : ""}.` +
-      prevus.filter((p) => chaussureDe(p.description)).map((p) => ` 👟 <b>${esc(chaussureDe(p.description))}</b>`).join("")
+      prevus.filter((p) => chaussureDe(p.description)).map((p) => ` ${ico("footprints")} <b>${esc(chaussureDe(p.description))}</b>`).join("")
     : `Rien de prévu dans Intervals.${s.cible ? ` Cible du jour : ${esc(s.cible)}.` : ""}`;
   el.innerHTML = `
     ${s.alert ? `<p class="alerte">Signaux inhabituels deux nuits de suite (FC de repos, HRV)</p>` : ""}
@@ -3245,7 +3252,7 @@ function rendreSaison() {
     detail = `<div class="sd"><b>${D.fmt(j, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</b>
       ${I.courses.map((c) => `<div class="sd-l"><span class="tag-${c.priorite === "A" ? "l" : c.priorite === "C" ? "c" : "b"}">COURSE ${c.priorite}</span> ${esc(c.nom)} ${c.sport ? "· " + esc(c.sport) : ""} ${c.distance ? "· " + esc(c.distance) : ""}</div>`).join("")}
       ${I.exam ? `<div class="sd-l"><span class="tag tag-o">${esc(I.exam.nom)}</span> ${D.court(I.exam.debut)} – ${D.court(I.exam.fin)}</div>` : ""}
-      <div class="sd-l muted">📍 ${I.sejour ? `${esc(I.sejour.lieu)} (du ${D.court(I.sejour.du)} au ${D.court(I.sejour.au)})` : "Valence"}</div>
+      <div class="sd-l muted">${ico("map-pin")} ${I.sejour ? `${esc(I.sejour.lieu)} (du ${D.court(I.sejour.du)} au ${D.court(I.sejour.au)})` : "Valence"}</div>
       ${I.acts.map((a) => `<div class="sd-l"><span class="pastille" style="background:${SPORTS[fam(a.sport)].c}"></span>${esc(a.nom)} · ${dureeFmt(a.duree_s)}${a.tss ? " · " + a.tss + " TSS" : ""}</div>`).join("")}
       ${I.evts.filter((e) => !I.acts.some((a) => fam(a.sport) === fam(e.sport))).map((e) => `<div class="sd-l muted"><span class="pastille" style="background:${SPORTS[fam(e.sport)].c}"></span>Prévu : ${esc(e.nom)}${e.duree_s ? " · " + dureeFmt(e.duree_s) : ""}${e.tss ? " · " + e.tss + " TSS" : ""}</div>`).join("")}
       ${!I.acts.length && !I.evts.length && I.prevision ? `<div class="sd-l muted">Pas encore de séance planifiée. Charge visée ce jour-là : environ ${Math.round(I.prevision)} TSS (d'après l'arc).</div>` : ""}
@@ -3285,7 +3292,7 @@ function rendreSaison() {
       <div class="seuils-btns"><button class="btn btn-noir-simple" type="submit">Ajouter la période</button><span class="muted petit" id="exam-msg"></span></div>
     </form>
     <div class="mono-lab sep">SÉJOURS HORS DE VALENCE</div>
-    <div class="exams">${(S.lieux || []).filter((x) => x.au >= S.today).map((x) => `<div class="ex"><span class="tag tag-lieu">📍 ${esc(x.lieu)}</span><span class="mono petit">${D.court(x.du)} – ${D.court(x.au)}</span><button class="r-suppr" data-sej="${esc(x.id)}" aria-label="Supprimer">✕</button></div>`).join("") || `<p class="muted petit">Aucun séjour prévu. Ajoute tes passages à Bagnères-de-Bigorre : le plan y privilégiera dénivelé, VTT et trail, et tes cours n'y bloqueront plus les créneaux.</p>`}</div>
+    <div class="exams">${(S.lieux || []).filter((x) => x.au >= S.today).map((x) => `<div class="ex"><span class="tag tag-lieu">${ico("map-pin")} ${esc(x.lieu)}</span><span class="mono petit">${D.court(x.du)} – ${D.court(x.au)}</span><button class="r-suppr" data-sej="${esc(x.id)}" aria-label="Supprimer">✕</button></div>`).join("") || `<p class="muted petit">Aucun séjour prévu. Ajoute tes passages à Bagnères-de-Bigorre : le plan y privilégiera dénivelé, VTT et trail, et tes cours n'y bloqueront plus les créneaux.</p>`}</div>
     <form class="seuils" id="f-sej" style="margin-top:10px">
       <label>Lieu<input name="lieu" maxlength="40" value="Bagnères-de-Bigorre" required></label>
       <label>Du<input name="du" type="date" required></label>
@@ -3405,7 +3412,7 @@ function rendreMateriel() {
     .flatMap((p) => [p, ...tous.filter((x) => x.parent_id === p.id).sort((a, b) => b.pct - a.pct)]);
   if (!L.length) { el.innerHTML = `<p class="muted pad">Aucun matériel suivi pour l'instant.</p>`; return; }
   const ROLE = { quotidien: "Quotidien", competition: "Compétition", trail: "Trail", route: "Route", vtt: "VTT", ht: "Home trainer" };
-  const EMO = { Run: "👟", Ride: "🚲" };
+  const EMO = { Run: ico("footprints"), Ride: ico("bike") };
   const qte = (x, p) => (p.unite === "h" ? `${nf(x)} h` : U() === "km" ? `${nf(x)} km` : `${nf(x / 1.60934)} mi`);
   el.innerHTML = L.map((p) => {
     const pct = Number(p.pct) || 0, coul = pct >= 100 ? C.rouge : pct >= 80 ? C.orange : C.vert;
@@ -3417,10 +3424,10 @@ function rendreMateriel() {
     const prev = pv && pv.par_semaine ? [`≈ ${qte(pv.par_semaine, p)}/sem.`, pv.date_seuil && pct < 100 ? `seuil vers le ${pv.date_seuil.slice(0, 4) === S.today.slice(0, 4) ? D.court(pv.date_seuil) : D.fmt(pv.date_seuil, { month: "short", year: "numeric" })}` : null, pv.provisoire ? "estimation provisoire (suivi récent)" : null].filter(Boolean).join(" · ") : "";
     const alerteCourse = c && p.sport === "Run" && p.role === "competition" && c.pct >= 80;
     const course = c && p.sport === "Run" && (p.role === "competition" || c.pct >= 80)
-      ? `<div class="petit mat-s" style="color:${c.pct >= 100 ? C.rouge : c.pct >= 80 ? C.orange : "inherit"}">🏁 ${esc(c.nom)} (${D.court(c.date)}) : ~${qte(c.km_prevus, p)}, ${c.pct} %${alerteCourse ? " — prévois une paire neuve à roder avant" : " — OK pour la course"}</div>` : "";
-    const dl = p.douleurs?.douleurs ? `<div class="petit mat-s" style="color:${C.orange}">⚠️ ${p.douleurs.douleurs} note${p.douleurs.douleurs > 1 ? "s" : ""} de douleur sur ${p.douleurs.notes}${Object.keys(p.douleurs.zones).length ? " (" + Object.entries(p.douleurs.zones).map(([z, n]) => `${z}${n > 1 ? " ×" + n : ""}`).join(", ") + ")" : ""}</div>` : "";
+      ? `<div class="petit mat-s" style="color:${c.pct >= 100 ? C.rouge : c.pct >= 80 ? C.orange : "inherit"}">${ico("flag")} ${esc(c.nom)} (${D.court(c.date)}) : ~${qte(c.km_prevus, p)}, ${c.pct} %${alerteCourse ? " — prévois une paire neuve à roder avant" : " — OK pour la course"}</div>` : "";
+    const dl = p.douleurs?.douleurs ? `<div class="petit mat-s" style="color:${C.orange}">${ico("triangle-alert")} ${p.douleurs.douleurs} note${p.douleurs.douleurs > 1 ? "s" : ""} de douleur sur ${p.douleurs.notes}${Object.keys(p.douleurs.zones).length ? " (" + Object.entries(p.douleurs.zones).map(([z, n]) => `${z}${n > 1 ? " ×" + n : ""}`).join(", ") + ")" : ""}</div>` : "";
     return `<div class="mat"${p.parent_id ? ' style="margin-left:18px"' : ""}>
-      <div class="mat-t"><b>${p.parent_id ? "🔧" : EMO[p.sport] ?? "🔧"} ${esc(p.nom)}</b><span class="mono">${qte(p.km_total, p)} / ${qte(p.km_alerte, p)} · ${pct} %</span></div>
+      <div class="mat-t"><b>${p.parent_id ? ico("wrench") : EMO[p.sport] ?? ico("wrench")} ${esc(p.nom)}</b><span class="mono">${qte(p.km_total, p)} / ${qte(p.km_alerte, p)} · ${pct} %</span></div>
       <div class="barre"><i style="width:${Math.min(100, pct)}%;background:${coul}"></i></div>
       <div class="muted petit mat-s">${esc(info)}${prev ? " · " + prev : ""}${conseil ? ` · <span style="color:${coul}">${conseil}</span>` : ""}</div>
       ${course}${dl}
@@ -3471,7 +3478,7 @@ function pastilleChaussure(e, a, avecMarque = false) {
   } else if (e) nom = chaussureDe(e.description);
   if (!nom) return "";
   const p = paireParNom(nom);
-  return `<span class="s-chaus${reel ? " reel" : ""}" style="--cr:${COUL_ROLE[p?.role] ?? C.doux}" title="${reel ? "Portées" : "À chausser"} : ${esc(nom)}">👟 ${esc(avecMarque ? nom : nomCourt(nom))}</span>`;
+  return `<span class="s-chaus${reel ? " reel" : ""}" style="--cr:${COUL_ROLE[p?.role] ?? C.doux}" title="${reel ? "Portées" : "À chausser"} : ${esc(nom)}">${ico("footprints")} ${esc(avecMarque ? nom : nomCourt(nom))}</span>`;
 }
 // Les 14 prochains jours de course, avec la paire prévue
 function prochainesSorties() {
@@ -5015,9 +5022,9 @@ RENDUS.push(rendreGarde, signalCourse, rendreTests, rendreEtat);
 // ============================================================
 const NIVEAU_COUL = { "#2ca02c": 1, "#2196f3": 2, "#ff2a0e": 3 };
 const HABITUDES = [
-  { k: "cafe", t: "Café après 16 h", i: "☕" }, { k: "alcool", t: "Alcool", i: "🍷" }, { k: "ecran", t: "Écran au lit", i: "📱" },
-  { k: "repas", t: "Dîner tardif", i: "🍝" }, { k: "stress", t: "Stress / examens", i: "📚" }, { k: "sieste", t: "Sieste", i: "😴" },
-  { k: "etirements", t: "Étirements / mobilité", i: "🧘" }, { k: "froid", t: "Douche ou bain froid", i: "🧊" },
+  { k: "cafe", t: "Café après 16 h", i: ico("coffee") }, { k: "alcool", t: "Alcool", i: ico("wine") }, { k: "ecran", t: "Écran au lit", i: ico("smartphone") },
+  { k: "repas", t: "Dîner tardif", i: ico("utensils") }, { k: "stress", t: "Stress / examens", i: ico("book-open") }, { k: "sieste", t: "Sieste", i: ico("bed") },
+  { k: "etirements", t: "Étirements / mobilité", i: ico("person-standing") }, { k: "froid", t: "Douche ou bain froid", i: ico("snowflake") },
 ];
 const montrerCarte = (c) => {
   if (!c) return;
@@ -5156,7 +5163,7 @@ function rendreRecords() {
   if (nage && 100 / nage.vitesse_ms > 55 && 100 / nage.vitesse_ms < p.css_s_100m - 2) props.push({ k: "css_s_100m", txt: `Natation de ${dureeFmt(nage.duree_s)} à <b>${mmss(100 / nage.vitesse_ms)}/100 m</b> de moyenne le ${D.court(nage.date)}, plus vite que ta CSS (${mmss(p.css_s_100m)}). Pauses comprises ou non selon la montre : à vérifier.`, val: Math.round(100 / nage.vitesse_ms), aff: `${mmss(100 / nage.vitesse_ms)}/100 m` });
   const dernierRec = (S.d.records || []).map((r) => String(r.date || "").slice(0, 10)).filter(Boolean).sort().at(-1);
   const perime = !props.length && (!dernierRec || D.diff(t, dernierRec) > 42);
-  el.innerHTML = `${recs.length ? `<div class="mono-lab">RECORDS DES 30 DERNIERS JOURS</div><div class="chips" style="margin:6px 0 10px">${recs.map((r) => `<span class="chip on">🏅 ${NOMS[r.duration_s]} · ${Math.round(r.watts)} W · ${D.court(String(r.date).slice(0, 10))}</span>`).join("")}</div>` : ""}
+  el.innerHTML = `${recs.length ? `<div class="mono-lab">RECORDS DES 30 DERNIERS JOURS</div><div class="chips" style="margin:6px 0 10px">${recs.map((r) => `<span class="chip on">${ico("medal")} ${NOMS[r.duration_s]} · ${Math.round(r.watts)} W · ${D.court(String(r.date).slice(0, 10))}</span>`).join("")}</div>` : ""}
     ${props.length ? props.map((x) => `<div class="xt-prop">${xtVerdict(x.txt + " Ton seuil est probablement trop prudent.", "att")}<button type="button" class="btn" data-seuil="${x.k}" data-val="${x.val}">Mettre à jour (${x.aff})</button></div>`).join("")
       : xtVerdict(perime ? `Aucun record ni signe de progression depuis ${dernierRec ? D.court(dernierRec) : "longtemps"} : tes seuils peuvent être périmés. Un test (voir le calendrier) ou un effort maximal en sortie les remettra à jour.` : "Seuils cohérents avec tes dernières séances.", perime ? "att" : "ok")}
     <p class="muted petit">Les mises à jour partent dans Intervals.icu après ta confirmation, et les zones sont recalculées. Rien ne change sans ton clic.</p>`;
