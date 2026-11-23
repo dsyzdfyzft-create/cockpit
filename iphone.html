@@ -850,6 +850,7 @@ table.det-iv th, table.det-iv td { padding: 5px 6px; border-bottom: 1px solid va
 table.det-iv th:first-child, table.det-iv td:first-child { text-align: left; }
 table.det-iv tr.work td { font-weight: 600; }
 table.det-iv tr[data-iv] { cursor: pointer; }
+.histo-test { margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; }
 .sem-corps { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 10px; align-items: start; }
 @media (max-width: 1000px) { .sem-corps { grid-template-columns: minmax(0, 1fr); } }
 .sem-resume { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; border: 1px solid var(--ligne); border-radius: 6px; font-size: 12.5px; }
@@ -2698,6 +2699,69 @@ const fmtVit = (v, allure) => (v == null ? "–" : allure ? mmss(v) : nf(v, 1) +
 document.addEventListener("click", (e) => { const v = e.target.closest("[data-voir]"); if (v && !CMP?.actif) { e.preventDefault(); e.stopPropagation(); ouvrirDetail(v.dataset.voir); } }, true);
 document.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("[data-voir]")) { e.preventDefault(); ouvrirDetail(e.target.dataset.voir); } });
 
+// Type de séance façon Nolio : nom de la séance (ou de la séance prévue associée), sinon l'intensité (IF)
+const TYPES_SEANCE = [
+  ["VMA / PMA", "#a3122a", /vma|pma|30\s*\/\s*30|45\s*\/\s*15|sprint|pyramide|\b400\s*m|\b200\s*m/i],
+  ["Seuil", "#e0483e", /seuil|threshold|\bcss\b|over.?under|\bftp\b|\bcp\b|cooper/i],
+  ["Tempo / sweet spot", "#e8a23a", /tempo|sweet\s*spot|allure\s*(semi|marathon|course)/i],
+  ["Côtes / force", "#8a5a2b", /côte|cote|force|hill|dénivelé/i],
+  ["Sortie longue", "#3b6cf0", /longue|long\s*run/i],
+  ["Enchaînement", "#7a5cf0", /brick|enchaîn/i],
+  ["Récup / technique", "#9ca3af", /récup|recup|technique|éduc|educ/i],
+];
+function typeSeance(a) {
+  if (/weight|workout|yoga/i.test(a.sport || "")) return ["Renfo / autre", "#c7a8e8"];
+  const e = S.evts.find((x) => String(x.activite_liee) === String(a.id)) || S.evts.find((x) => x.categorie === "WORKOUT" && x.date === a.date && fam(x.sport) === fam(a.sport));
+  const txt = `${a.nom} ${e?.nom || ""}`;
+  const t = TYPES_SEANCE.find(([, , re]) => re.test(txt));
+  if (t) return [t[0], t[1]];
+  const f = fam(a.sport);
+  if ((f === "Ride" && a.duree_s >= 9000) || (f === "Run" && a.duree_s >= 4800)) return ["Sortie longue", "#3b6cf0"];
+  if (a.if >= 1.0) return ["VMA / PMA", "#a3122a"];
+  if (a.if >= 0.88) return ["Seuil", "#e0483e"];
+  if (a.if >= 0.78) return ["Tempo / sweet spot", "#e8a23a"];
+  return ["Endurance", "#3faa6f"];
+}
+function rendreTypesSeance() {
+  if (!$("#g-types")) return;
+  const B = seaux(), A = actsEntre(debutPlage(), S.today), noms = new Map();
+  for (const a of A) { const [n, c] = typeSeance(a); noms.set(n, c); }
+  const ordre = ["Endurance", "Sortie longue", "Tempo / sweet spot", "Seuil", "VMA / PMA", "Côtes / force", "Enchaînement", "Récup / technique", "Renfo / autre"].filter((n) => noms.has(n));
+  graph("g-types", { type: "bar",
+    data: { labels: B.map((b) => b.lab), datasets: ordre.map((n) => ({ label: n, backgroundColor: noms.get(n), stack: "t", borderRadius: 1, barPercentage: 0.7,
+      data: B.map((b) => Math.round(somme(actsEntre(b.de, b.a).filter((a) => typeSeance(a)[0] === n).map((a) => a.duree_s)) / 360) / 10) })) },
+    options: { scales: { x: { ...axeX(), stacked: true }, y: { stacked: true, ticks: { callback: (v) => v + " h", maxTicksLimit: 5 } } },
+      plugins: { tooltip: { callbacks: { label: (it) => `${it.dataset.label} : ${nf(it.raw, 1)} h` } } } },
+  });
+  const tot = somme(A.map((a) => a.duree_s)), el = $("#types-leg");
+  if (el) el.innerHTML = tot ? ordre.map((n) => { const s = somme(A.filter((a) => typeSeance(a)[0] === n).map((a) => a.duree_s)); return `<span><b style="color:${noms.get(n)}">■</b> ${n} ${nf((s / tot) * 100)} %</span>`; }).join("") : "";
+}
+
+// ---------- 6. Statistiques par période (façon Nolio) ----------
+function rendreStatsPeriode() {
+  const el = $("#c-stats .xt-corps"); if (!el) return;
+  $$("[data-stats]").forEach((b) => b.classList.toggle("on", b.dataset.stats === (S.ui.stats || "mois")));
+  const t = S.today, P = [];
+  if ((S.ui.stats || "mois") === "mois") {
+    for (let k = 0; k < 12; k++) { const d = new Date(t.slice(0, 7) + "-01T12:00:00Z"); d.setUTCMonth(d.getUTCMonth() - k); const de = d.toISOString().slice(0, 10); d.setUTCMonth(d.getUTCMonth() + 1); d.setUTCDate(0); P.push({ lab: D.fmt(de, { month: "short", year: "2-digit" }), de, a: d.toISOString().slice(0, 10) }); }
+  } else {
+    let B = []; try { B = blocsSaison().blocs || []; } catch (e) {}
+    // Blocs passés et en cours, puis les mois avant le premier bloc
+    for (const b of B.filter((b) => b.du <= t).reverse()) P.push({ lab: b.nom, de: b.du, a: b.au < t ? b.au : t });
+    if (!P.length) return void (el.innerHTML = '<p class="muted petit">Pas encore de bloc commencé : passe en vue « Mois ».</p>');
+  }
+  const lig = P.map((p) => {
+    const A = actsEntre(p.de, p.a), km = (f) => somme(A.filter((a) => fam(a.sport) === f).map((a) => a.distance_m));
+    return { ...p, n: A.length, h: somme(A.map((a) => a.duree_s)), tss: somme(A.map((a) => a.tss)), nat: km("Swim"), velo: km("Ride"), run: km("Run"), dp: somme(A.map((a) => a.denivele_m)) };
+  });
+  while (lig.length > 1 && !lig.at(-1).n) lig.pop(); // mois sans aucune séance avant le début de l'historique
+  const ec = (x, y) => (y ? `<span class="${x >= y ? "xt-ok" : "xt-att"} petit">${x >= y ? "+" : ""}${nf(((x - y) / y) * 100)} %</span>` : "");
+  el.innerHTML = `<div class="cmp-tab"><table class="tab"><thead><tr><th>${(S.ui.stats || "mois") === "mois" ? "Mois" : "Bloc"}</th><th>Séances</th><th>Heures</th><th>TSS</th><th>Nat.</th><th>Vélo</th><th>Course</th><th>D+</th></tr></thead><tbody>
+    ${lig.map((l, i) => `<tr><td>${esc(l.lab)}</td><td class="mono">${l.n}</td><td class="mono">${nf(l.h / 3600, 1)} ${ec(l.h, lig[i + 1]?.h)}</td><td class="mono">${nf(l.tss)}</td><td class="mono">${l.nat ? nf(l.nat / 1000, 1) + " km" : "–"}</td><td class="mono">${l.velo ? dist(l.velo, 0) : "–"}</td><td class="mono">${l.run ? dist(l.run, 1) : "–"}</td><td class="mono">${l.dp ? nf(l.dp) + " m" : "–"}</td></tr>`).join("")}
+    </tbody></table></div><p class="muted petit">Écart d'heures face à la période précédente. Historique limité aux 12 derniers mois.</p>`;
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-stats]"); if (b) { S.ui.stats = b.dataset.stats; rendreStatsPeriode(); } });
+
 const metJour = (j) => {
   if (j > S.today) return "";
   const so = S.sommeil.get(j), h = S.luna.get(j);
@@ -2794,7 +2858,7 @@ async function charger() {
 const RENDUS = [rendreEntete, rendreKpis, rendreDecision, rendreReadiness, rendreDrapeau, rendreEquilibre, rendreZones, rendreJournal,
   rendreGlissant, rendrePmc, rendreVolume, rendreAllure, rendreEfficacite, rendreRepartition, rendreZonesRep, rendrePuissance,
   rendreBienEtre, rendreDeuxHrv, rendrePoids, rendreCourse, rendreArc, rendrePlan,
-  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel, rendreBriquesRessenti, rendrePics, rendreZonesSemaine, rendreRepartSports];
+  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel, rendreBriquesRessenti, rendrePics, rendreZonesSemaine, rendreRepartSports, rendreTypesSeance, rendreStatsPeriode];
 
 function toutRendre() {
   if (!S.d) return;
@@ -5085,6 +5149,13 @@ const TYPES_TEST = [
   { k: "cooper", nom: "Demi-Cooper", re: /cooper|vma\s*test|test\s*vma/i, sport: "Run", tous: 8 },
   { k: "css", nom: "CSS natation", re: /\bcss\b|400\s*\/\s*200|test\s*nat/i, sport: "Swim", tous: 8 },
 ];
+// Résultat d'un test : texte long, texte court et valeur pour la progression (VMA km/h, W, s/100 m)
+function resTest(T, a) {
+  if (T.k === "cooper" && a.distance_m) { const v = a.distance_m / 100; return { txt: `${nf(a.distance_m)} m → VMA ${nf(v, 1)} km/h`, court: `VMA ${nf(v, 1)}`, v }; }
+  if (T.k === "cp") { const v = a.eftp || a.np || null; return { txt: [a.np ? `NP ${a.np} W` : null, a.eftp ? `eFTP ${a.eftp} W` : null].filter(Boolean).join(" · ") || "–", court: v ? `${v} W` : "–", v }; }
+  if (T.k === "css" && a.vitesse_ms) { const v = 100 / a.vitesse_ms; return { txt: `${mmss(v)}/100 m de moyenne (seuil réglé ${mmss(S.prof.css_s_100m)})`, court: `${mmss(v)}/100 m`, v }; }
+  return { txt: "–", court: "–", v: null };
+}
 function rendreTests() {
   const el = $("#c-tests .xt-corps"); if (!el) return;
   const t = S.today;
@@ -5093,12 +5164,7 @@ function rendreTests() {
     const faits = S.acts.filter((a) => T.re.test(`${a.nom} ${a.description || ""}`) && fam(a.sport) === T.sport).sort((a, b) => b.date.localeCompare(a.date));
     const dernier = faits[0];
     const prevu = S.evts.filter((e) => e.date >= t && T.re.test(`${e.nom} ${e.description || ""}`)).sort((a, b) => a.date.localeCompare(b.date))[0];
-    let res = "–";
-    if (dernier) {
-      if (T.k === "cooper" && dernier.distance_m) res = `${nf(dernier.distance_m)} m → VMA ${nf(dernier.distance_m / 100, 1)} km/h`;
-      else if (T.k === "cp") res = [dernier.np ? `NP ${dernier.np} W` : null, dernier.eftp ? `eFTP ${dernier.eftp} W` : null].filter(Boolean).join(" · ") || "–";
-      else if (T.k === "css") res = `seuil actuel ${mmss(S.prof.css_s_100m)}/100 m`;
-    }
+    const res = dernier ? resTest(T, dernier).txt : "–";
     const age = dernier ? Math.round(D.diff(t, dernier.date) / 7) : null;
     // Prochaine occasion : semaine légère à venir, au moins 6 semaines après le dernier test
     const occasion = legeres.find((l) => l >= D.lundi(t) && (!dernier || D.diff(l, dernier.date) >= 42));
@@ -5106,8 +5172,18 @@ function rendreTests() {
     const retard = !prevu && (age == null || age >= T.tous);
     return `<tr><td><b>${T.nom}</b></td><td class="mono">${dernier ? D.court(dernier.date) + (age != null ? ` <span class="muted">(${age} sem.)</span>` : "") : '<span class="muted">aucun trouvé</span>'}</td><td class="mono">${res}</td><td class="${retard ? "xt-att" : ""}">${prochain}</td></tr>`;
   }).join("");
+  // Historique façon Nolio : tous les tests reconnus, avec l'écart au précédent
+  const histo = TYPES_TEST.map((T) => {
+    const L = S.acts.filter((a) => T.re.test(`${a.nom} ${a.description || ""}`) && fam(a.sport) === T.sport).sort((a, b) => a.date.localeCompare(b.date)).map((a) => ({ a, ...resTest(T, a) }));
+    if (!L.length) return "";
+    return `<div class="histo-test"><b>${T.nom}</b> ${L.map((x, i) => {
+      const p = L[i - 1], d = p?.v && x.v ? ((x.v - p.v) / p.v) * 100 * (T.k === "css" ? -1 : 1) : null;
+      return `<span class="chip">${D.court(x.a.date)}${x.a.date.slice(0, 4) !== t.slice(0, 4) ? " " + x.a.date.slice(0, 4) : ""} · ${x.court}${d != null ? ` <span class="${d >= 0 ? "xt-ok" : "xt-att"}">${d >= 0 ? "+" : ""}${nf(d, 1)} %</span>` : ""}</span>`;
+    }).join("")}</div>`;
+  }).join("");
   const eftps = S.acts.filter((a) => a.eftp && D.diff(t, a.date) <= 120).sort((a, b) => a.date.localeCompare(b.date));
   el.innerHTML = `<div class="cmp-tab"><table class="tab"><thead><tr><th>Test</th><th>Dernier</th><th>Résultat</th><th>Prochain</th></tr></thead><tbody>${lignes}</tbody></table></div>
+    ${histo ? `<div class="mono-lab" style="margin-top:12px">HISTORIQUE DES TESTS</div>${histo}` : ""}
     ${eftps.length >= 3 ? `<div class="g" style="height:${MOBILE ? 150 : 160}px;margin-top:12px"><canvas id="g-eftp"></canvas></div>` : ""}
     <p class="muted petit">Un test est reconnu par le nom de la séance (« test CP », « 3/12 », « 5/15 », « demi-Cooper », « CSS », « 400/200 »). Rythme conseillé : toutes les 6 à 8 semaines, en semaine légère. Courbe : eFTP estimée par Intervals sur chaque sortie, face à ta FTP réglée (${S.prof.ftp} W).</p>`;
   if (eftps.length >= 3) graph("g-eftp", { type: "line",
@@ -5266,6 +5342,11 @@ const montrerCarte = (c) => {
   const zs = carte("c-zsem", "Temps en zones par semaine", '<div class="seg seg-mini"><button data-zsem="fc">FC</button><button data-zsem="pw">Puissance</button></div>');
   $(".xt-corps", zs).innerHTML = '<div class="g" style="height:260px"><canvas id="g-zsem"></canvas></div>';
   ($("#g-intensite") || $("#g-volume"))?.closest(".carte")?.after(zs);
+  const ty = carte("c-types", "Volume par type de séance", '<span class="muted petit">d\'après le nom de la séance, sinon l\'intensité</span>');
+  $(".xt-corps", ty).innerHTML = '<div class="repart-leg" id="types-leg"></div><div class="g" style="height:260px"><canvas id="g-types"></canvas></div>';
+  zs.after(ty);
+  const st = carte("c-stats", "Statistiques par période", '<div class="seg seg-mini"><button data-stats="mois">Mois</button><button data-stats="bloc">Blocs</button></div>');
+  ($("#g-volume")?.closest(".carte") || zs).after(st);
   const rp = document.createElement("div"); rp.id = "vol-repart"; $("#g-volume")?.closest(".g")?.before(rp);
   $("#c-pred")?.closest(".carte")?.after(carte("c-fiche", "Fiche de course", '<button type="button" class="btn" data-imprimer-fiche>Imprimer</button>'));
   // Chaleur : case à cocher dans la carte « Zones du jour » (indicatif, ne modifie rien)
