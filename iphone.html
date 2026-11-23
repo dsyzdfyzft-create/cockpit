@@ -850,6 +850,8 @@ table.det-iv th, table.det-iv td { padding: 5px 6px; border-bottom: 1px solid va
 table.det-iv th:first-child, table.det-iv td:first-child { text-align: left; }
 table.det-iv tr.work td { font-weight: 600; }
 table.det-iv tr[data-iv] { cursor: pointer; }
+.det-prs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.det-prs .chip { cursor: pointer; font-size: 12.5px; }
 .histo-test { margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; }
 .sem-corps { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 10px; align-items: start; }
 @media (max-width: 1000px) { .sem-corps { grid-template-columns: minmax(0, 1fr); } }
@@ -2669,11 +2671,37 @@ async function ouvrirDetail(id) {
       d.altitude?.some((x) => x) && { label: "Altitude (m)", data: d.altitude, borderColor: "rgba(140,145,155,.6)", backgroundColor: "rgba(140,145,155,.15)", fill: "origin", yAxisID: "y3" },
     ].filter(Boolean).map((x) => ({ type: "line", borderWidth: 1.3, pointRadius: 0, tension: 0.2, spanGaps: true, ...x }));
     const IV = (d.intervalles || []).filter((iv) => iv.duree_s);
-    corps.innerHTML = `<div class="det-stats">${stats}</div>
+    // Performances de pointe de la séance : record à vie ou top 3 sur 12 mois, placées sur les courbes
+    const gAn = classerPics(D.add(S.today, -365)), gVie = classerPics("");
+    const PR = (S.pics || []).filter((p) => p.id === String(id)).map((p) => {
+      const k = p.sport + "|" + p.mesure + "|" + p.cle, rang = (gAn[k] || []).findIndex((x) => x.id === p.id) + 1;
+      return { ...p, rang, vie: gVie[k]?.[0]?.id === p.id };
+    }).filter((p) => p.vie || (p.rang >= 1 && p.rang <= 3));
+    // Fenêtre de la séance où l'effort a été fait (courbes réduites : position approchée)
+    const placer = (p) => {
+      if (p.mesure === "allure") {
+        const Dm = d.distance_m || []; let best = null;
+        for (let i = 0, j = 0; i < Dm.length; i++) { while (j < Dm.length && (Dm[j] ?? 0) - (Dm[i] ?? 0) < p.r) j++; if (j >= Dm.length) break; const dt = T[j] - T[i]; if (!best || dt < best[2]) best = [i, j, dt]; }
+        return best;
+      }
+      const v = (p.mesure === "fc" ? d.fc : d.puissance) || []; let best = null;
+      for (let i = 0, j = 0, s = 0; i < v.length; i++) {
+        while (j < v.length && T[j] - T[i] < p.r) { s += v[j] || 0; j++; }
+        if (j >= v.length && T[v.length - 1] - T[i] < p.r) break;
+        const m = s / Math.max(1, j - i); if (!best || m > best[2]) best = [i, Math.max(i + 1, j - 1), m];
+        s -= v[i] || 0;
+      }
+      return best;
+    };
+    const valPR = (p) => (p.mesure === "fc" ? `${Math.round(p.v)} bpm` : p.mesure === "puissance" ? `${Math.round(p.v)} W` : `${mmss(p.v)}${p.sport === "Swim" ? "" : ` · ${mmss(p.v / (p.r / 1000))}/km`}`);
+    const prHtml = PR.length ? `<div class="det-prs">${PR.map((p, i) => `<button type="button" class="chip" data-pr="${i}" title="Voir sur le graphique">${p.vie ? "🏆" : ["🥇", "🥈", "🥉"][p.rang - 1]} ${p.mesure === "fc" ? "FC " : ""}${esc(p.cle)} · <b class="mono">${valPR(p)}</b> <span class="muted">${p.vie ? "record à vie" : p.rang === 1 ? "meilleure sur 12 mois" : p.rang + "e sur 12 mois"}</span></button>`).join("")}</div>` : "";
+    corps.innerHTML = `<div class="det-stats">${stats}</div>${prHtml}
       ${ds.length ? `<div class="g" style="height:${MOBILE ? 240 : 320}px"><canvas id="g-det"></canvas></div><p class="det-sel muted" id="det-sel">Glisse sur le graphique pour analyser une portion.</p>` : `<p class="muted">Pas de courbe pour cette séance.</p>`}
       ${IV.length ? `<table class="det-iv"><thead><tr><th>Intervalle</th><th>Durée</th><th>Dist.</th><th>W moy.</th><th>NP</th><th>FC</th><th>${course || nage ? "Allure" : "Vitesse"}</th></tr></thead><tbody>${IV.map((iv, i) => `<tr class="${iv.type === "WORK" ? "work" : ""}" data-iv="${i}"><td>${esc(iv.nom || (iv.type === "WORK" ? "Effort" : "Récup"))}</td><td class="mono">${dureeFmt(iv.duree_s)}</td><td class="mono">${iv.distance_m ? dist(iv.distance_m, 2) : "–"}</td><td class="mono">${iv.puissance ?? "–"}</td><td class="mono">${iv.np ?? "–"}</td><td class="mono">${iv.fc ?? "–"}</td><td class="mono">${fmtVit(vit(iv.vitesse_ms), course || nage)}</td></tr>`).join("")}</tbody></table>` : ""}`;
     if (!ds.length) return;
-    graph("g-det", { data: { labels: T.map((s) => dureeFmt(s)), datasets: ds },
+    // Zone sélectionnée (portion glissée, intervalle ou record) surlignée sur le graphique
+    const zone = { id: "zoneSel", beforeDatasetsDraw(c) { const s = c.$sel; if (!s) return; const x0 = c.scales.x.getPixelForValue(s[0]), x1 = c.scales.x.getPixelForValue(s[1]); c.ctx.save(); c.ctx.fillStyle = "rgba(232,195,58,.22)"; c.ctx.fillRect(x0, c.chartArea.top, Math.max(2, x1 - x0), c.chartArea.height); c.ctx.restore(); } };
+    graph("g-det", { plugins: [zone], data: { labels: T.map((s) => dureeFmt(s)), datasets: ds },
       options: { scales: { x: axeX(8), y: { display: ds.some((x) => x.yAxisID === "y"), position: "left" }, y1: { display: ds.some((x) => x.yAxisID === "y1"), position: "right", grid: { display: false } }, y2: { display: false, reverse: course || nage }, y3: { display: false } } } });
     // Sélection d'une portion : moyenne de chaque courbe entre deux points
     const sel = (i0, i1) => {
@@ -2681,7 +2709,14 @@ async function ouvrirDetail(id) {
       const p = moy(d.puissance), f = moy(d.fc), v = moy(d.vitesse_ms), dm = d.distance_m ? (d.distance_m[i1] ?? 0) - (d.distance_m[i0] ?? 0) : null;
       $("#det-sel").innerHTML = `Sélection <b class="mono">${dureeFmt((T[i1] ?? 0) - (T[i0] ?? 0))}</b>${dm > 0 ? ` · <b class="mono">${dist(dm, 2)}</b>` : ""}${p ? ` · <b class="mono">${Math.round(p)} W</b>` : ""}${f ? ` · <b class="mono">${Math.round(f)} bpm</b>` : ""}${v ? ` · <b class="mono">${fmtVit(vit(v), course || nage)}</b>` : ""}`;
       $("#det-sel").classList.remove("muted");
+      const ch = CH["g-det"]; if (ch) { ch.$sel = [i0, i1]; ch.draw(); }
     };
+    $$("[data-pr]", corps).forEach((b) => b.addEventListener("click", () => {
+      const w = placer(PR[Number(b.dataset.pr)]);
+      $$("[data-pr]", corps).forEach((x) => x.classList.toggle("on", x === b));
+      if (w) sel(w[0], w[1]); else $("#det-sel").textContent = "Position introuvable sur les courbes de cette séance.";
+    }));
+    $("[data-pr]", corps)?.click(); // montre le premier record dès l'ouverture
     const cv = $("#g-det"); let i0 = null;
     const idx = (e) => CH["g-det"]?.getElementsAtEventForMode(e, "index", { intersect: false }, false)[0]?.index;
     cv.onpointerdown = (e) => { i0 = idx(e); };
