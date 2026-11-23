@@ -831,6 +831,25 @@ h1, h2, h3, .marque { font-family: var(--titre); }
 .ico { width: 1em; height: 1em; vertical-align: -0.14em; flex: none; }
 /* Calendrier façon TrainingPeaks : métriques du jour, résumé de semaine, performances de pointe */
 .j-met { font-size: 11px; color: var(--doux); margin: -4px 0 8px; }
+.seance.c-vert { background: color-mix(in srgb, #3faa6f 18%, var(--surface)); }
+.seance.c-jaune { background: color-mix(in srgb, #e8c33a 24%, var(--surface)); }
+.seance.c-orange { background: color-mix(in srgb, #e8853a 22%, var(--surface)); }
+.seance.c-rouge { background: color-mix(in srgb, #e0483e 16%, var(--surface)); }
+.seance[data-voir] { cursor: pointer; }
+.s-note { --c: #8a8f98; font-size: 12px; }
+.s-prof { display: block; width: 100%; height: 22px; margin-top: 5px; }
+.sem-copier { font-size: 11.5px; padding: 3px 8px; }
+.repart { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 4px 0 6px; }
+.repart-leg { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--doux); margin-bottom: 8px; }
+.detail-boite { width: min(1000px, 100%); }
+.det-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; margin-bottom: 10px; }
+.det-stats b { font-family: var(--mono, monospace); }
+.det-sel { font-size: 13px; min-height: 20px; margin: 6px 0 12px; }
+table.det-iv { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.det-iv th, table.det-iv td { padding: 5px 6px; border-bottom: 1px solid var(--ligne); text-align: right; }
+table.det-iv th:first-child, table.det-iv td:first-child { text-align: left; }
+table.det-iv tr.work td { font-weight: 600; }
+table.det-iv tr[data-iv] { cursor: pointer; }
 .sem-corps { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 10px; align-items: start; }
 @media (max-width: 1000px) { .sem-corps { grid-template-columns: minmax(0, 1fr); } }
 .sem-resume { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; border: 1px solid var(--ligne); border-radius: 6px; font-size: 12.5px; }
@@ -1121,6 +1140,7 @@ function prep(d) {
     if (v > 0 && r) S.pics.push({ id: String(c.id), date: c.date, sport: b.sport, mesure: b.mesure, cle: lab(b.mesure, r), r, v });
   }));
   // Médailles du calendrier : 🏅 = top 3 sur 12 mois, 🏆 = record à vie battu pendant la séance
+  S._cibles = null;
   S.medailles = new Map(); S.trophees = new Map();
   const plus = (m, id) => m.set(id, (m.get(id) || 0) + 1);
   for (const L of Object.values(classerPics(D.add(S.today, -365)))) L.slice(0, 3).forEach((p) => plus(S.medailles, p.id));
@@ -1506,7 +1526,8 @@ function rendreJournal() {
         <div><span>Découplage</span><b>${a.decouplage != null ? a.decouplage + " %" : "–"}</b></div><div><span>D+</span><b>${a.denivele_m != null ? (U() === "km" ? a.denivele_m + " m" : Math.round(a.denivele_m * 3.281) + " ft") : "–"}</b></div>
       </div>
       ${a.zones_fc ? `<div class="mono-lab">TEMPS EN ZONES FC</div>${S.zones3 ? barreZones(regrouper3(a.zones_fc, false), COUL_Z3) : barreZones(a.zones_fc, COUL_Z)}` : ""}
-      ${a.description ? `<p class="desc">« ${esc(a.description)} »</p>` : ""}` : "";
+      ${a.description ? `<p class="desc">« ${esc(a.description)} »</p>` : ""}
+      <span class="btn" data-voir="${esc(a.id)}">Courbes et intervalles ›</span>` : "";
     return `<button class="act ${ouvert ? "ouvert" : ""}" data-act="${esc(a.id)}">
       <span class="ico" style="color:${SPORTS[f].c}">${ICONES[f]}</span>
       <span class="act-c"><span class="act-t"><b>${esc(a.nom)}</b><em>${jourRelatif(a.date)}${a.heure ? " · " + a.heure : ""}</em></span>
@@ -2515,11 +2536,17 @@ function carteSeance({ e, a }, jour) {
   else if (jour < S.today) [badge, cls] = ["MANQUÉ", "b-manque"];
   const fond = a ? (cls === "b-hors" ? "" : "fait") : "";
   const modifiable = e && !a && jour >= S.today;
-  return `<div class="seance ${fond} ${cls === "b-hors" ? "hors" : ""} ${modifiable ? "modif" : ""}" style="--c:${coul}" ${modifiable ? `data-evt="${esc(e.id)}" role="button" tabindex="0" title="Modifier la séance"` : ""}>
+  // Conformité façon TrainingPeaks : TSS fait / prévu (sinon durée). Vert 80–120 %, jaune 50–150 %, orange au-delà, rouge si manquée
+  let conf = "";
+  if (e && a) { const r = e.tss && a.tss ? a.tss / e.tss : e.duree_s && a.duree_s ? a.duree_s / e.duree_s : 1; conf = r >= 0.8 && r <= 1.2 ? "c-vert" : r >= 0.5 && r <= 1.5 ? "c-jaune" : "c-orange"; }
+  else if (e && jour < S.today) conf = "c-rouge";
+  const voir = a && !modifiable ? `data-voir="${esc(a.id)}" role="button" tabindex="0" title="Courbes et intervalles"` : "";
+  return `<div class="seance ${fond} ${conf} ${cls === "b-hors" ? "hors" : ""} ${modifiable ? "modif" : ""}" style="--c:${coul}" ${modifiable ? `data-evt="${esc(e.id)}" role="button" tabindex="0" title="Modifier la séance"` : voir}>
     <div class="s-tete"><span class="s-sport" style="color:${coul}">${SPORTS[f].nom.toUpperCase()}</span>${badge ? `<span class="sb ${cls}">${badge}</span>` : `<span class="s-duree">${e?.couleur ? `<i class="pz" style="background:${esc(e.couleur)}"></i>` : ""}${e?.heure ? e.heure + " · " : ""}${e?.duree_s ? dureeFmt(e.duree_s) : ""}</span>`}</div>
     <div class="s-nom">${esc(e?.nom || a?.nom)}</div>
     ${a ? `<div class="s-m mono">${dureeFmt(a.duree_s)}${a.distance_m ? " · " + dist(a.distance_m) : ""}${a.tss ? " · " + a.tss + " TSS" : ""}${S.trophees?.get(String(a.id)) ? ` · <span title="Records à vie battus">🏆${S.trophees.get(String(a.id))}</span>` : ""}${S.medailles?.get(String(a.id)) ? ` · <span title="Performances de pointe : top 3 sur 12 mois">🏅${S.medailles.get(String(a.id))}</span>` : ""}</div>` : ""}
     ${e && a && e.duree_s ? `<div class="s-p">· prévu ${dureeFmt(e.duree_s)}</div>` : ""}
+    ${e?.profil ? profilSvg(e.profil) : ""}
     ${pastilleChaussure(e, a)}
     ${!a && e?.description && sansChaussure(e.description) ? `<div class="s-p">${esc(sansChaussure(e.description).split("\n")[0]).slice(0, 70)}</div>` : ""}
   </div>`;
@@ -2527,9 +2554,9 @@ function carteSeance({ e, a }, jour) {
 
 // ---------- Performances de pointe (façon TrainingPeaks) ----------
 // Groupes « sport|repère » triés du meilleur au moins bon, séances depuis `de`
-function classerPics(de) {
+function classerPics(de, a = "9999") {
   const g = {};
-  for (const p of S.pics || []) if (p.date >= de) (g[p.sport + "|" + p.mesure + "|" + p.cle] ||= []).push(p);
+  for (const p of S.pics || []) if (p.date >= de && p.date <= a) (g[p.sport + "|" + p.mesure + "|" + p.cle] ||= []).push(p);
   for (const L of Object.values(g)) L.sort((a, b) => (a.mesure === "allure" ? a.v - b.v : b.v - a.v));
   return g;
 }
@@ -2537,6 +2564,8 @@ function rendrePics() {
   const el = $("#c-pics .xt-corps"); if (!el) return;
   $$("[data-pics-vie]").forEach((b) => b.classList.toggle("on", (b.dataset.picsVie === "1") === !!S.ui.picsVie));
   const g = classerPics(S.ui.picsVie ? "" : debutPlage());
+  // Comparaison de périodes : la même période un an plus tôt
+  const g1 = S.ui.picsVie ? null : classerPics(D.add(debutPlage(), -365), D.add(S.today, -365));
   const val = (p) => p.mesure === "fc" ? `${Math.round(p.v)} bpm`
     : p.mesure === "puissance" ? `${Math.round(p.v)} W${S.prof.poids ? ` · ${nf(p.v / S.prof.poids, 1)} W/kg` : ""}`
     : p.sport === "Swim" ? `${mmss(p.v)} · ${mmss(p.v / (p.r / 100))}/100 m` : `${mmss(p.v)} · ${mmss(p.v / (p.r / 1000))}/km`;
@@ -2545,10 +2574,129 @@ function rendrePics() {
     const L = Object.entries(g).filter(([k]) => k.startsWith(sp + "|" + me + "|"));
     if (!L.length) return "";
     return `<h4>${SPORTS[sp].nom} · ${NOMS[me]}</h4><table class="pics"><tbody>${L.map(([k, ps]) => `<tr><th>${esc(k.split("|")[2])}</th>${ps.slice(0, 3).map((p, i) =>
-      `<td title="${esc(S.acts.find((a) => String(a.id) === p.id)?.nom || "")}">${["🥇", "🥈", "🥉"][i]} <b class="mono">${val(p)}</b> <span class="muted petit">${D.court(p.date)}${p.date.slice(0, 4) !== S.today.slice(0, 4) ? " " + p.date.slice(0, 4) : ""}</span></td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      `<td title="${esc(S.acts.find((a) => String(a.id) === p.id)?.nom || "")}">${["🥇", "🥈", "🥉"][i]} <b class="mono">${val(p)}</b> <span class="muted petit">${D.court(p.date)}${p.date.slice(0, 4) !== S.today.slice(0, 4) ? " " + p.date.slice(0, 4) : ""}</span></td>`).join("")}${g1 ? (() => {
+      const avant = g1[k]?.[0]; if (!avant) return `<td class="muted petit">il y a 1 an : –</td>`;
+      const d = ((ps[0].v - avant.v) / avant.v) * 100 * (me === "allure" ? -1 : 1);
+      return `<td class="petit">il y a 1 an : <b class="mono">${val(avant)}</b> <span class="${d >= 0 ? "xt-ok" : "xt-att"}">${d >= 0 ? "+" : ""}${nf(d, 1)} %</span></td>`;
+    })() : ""}</tr>`).join("")}</tbody></table>`;
   })).join("");
   el.innerHTML = html || '<p class="muted petit">Pas encore de performance de pointe sur la période.</p>';
 }
+
+// Charge visée de la semaine (blocs de saison), calculée une fois par chargement
+function cibleSemaine(l) {
+  if (!S.obj?.date) return null;
+  if (!S._cibles) {
+    try { S._cibles = new Map(courbeCharge(S.today, ctlDu(S.today)?.ctl ?? 0, blocsSaison(), cibleCtl()).map((w) => [w.lundi, w.tss])); } catch (e) { S._cibles = new Map(); }
+  }
+  return S._cibles.get(l) || null;
+}
+
+// Mini-graphique d'une séance structurée : largeur = durée, hauteur et couleur = intensité
+const couleurInt = (i) => COUL_Z[i < 0.6 ? 0 : i < 0.76 ? 1 : i < 0.9 ? 2 : i < 1.05 ? 3 : i < 1.2 ? 4 : 5];
+function profilSvg(p) {
+  const tot = somme(p.map((x) => x[0])); if (!tot) return "";
+  let x = 0;
+  return `<svg class="s-prof" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">${p.map(([d, i]) => {
+    const w = (d / tot) * 100, h = Math.min(24, Math.max(3, (i / 1.4) * 24));
+    const r = `<rect x="${x.toFixed(2)}" y="${(24 - h).toFixed(2)}" width="${Math.max(w, 0.4).toFixed(2)}" height="${h.toFixed(2)}" fill="${couleurInt(i)}"/>`;
+    x += w; return r;
+  }).join("")}</svg>`;
+}
+
+// Copier une semaine de séances prévues vers la suivante (Intervals duplique les séances structurées)
+document.addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-copier]"); if (!b) return;
+  const ids = b.dataset.copier.split(",");
+  if (!confirm(`Copier les ${ids.length} séance${ids.length > 1 ? "s" : ""} prévue${ids.length > 1 ? "s" : ""} de la semaine du ${D.court(b.dataset.lundi)} vers la semaine suivante ?`)) return;
+  b.disabled = true; b.textContent = "Copie…";
+  try { const r = await envoyer({ evenement: { action: "dupliquer", ids } }); b.textContent = `${r.n ?? ids.length} copiée(s)`; charger(); }
+  catch (e) { alert("Copie impossible : " + e.message); b.disabled = false; b.textContent = "Copier → semaine suivante"; }
+});
+
+// Temps en zones semaine par semaine
+function rendreZonesSemaine() {
+  if (!$("#g-zsem")) return;
+  $$("[data-zsem]").forEach((b) => b.classList.toggle("on", (b.dataset.zsem === "pw") === !!S.ui.zsemPw));
+  const B = seaux(), cle = S.ui.zsemPw ? "zones_puissance" : "zones_fc";
+  const n = Math.min(7, Math.max(0, ...S.acts.map((a) => (a[cle] || []).length)));
+  graph("g-zsem", { type: "bar",
+    data: { labels: B.map((b) => b.lab), datasets: Array.from({ length: n }, (_, z) => ({
+      label: `Z${z + 1}`, data: B.map((b) => Math.round(somme(actsEntre(b.de, b.a).map((a) => a[cle]?.[z] || 0)) / 360) / 10),
+      backgroundColor: COUL_Z[z], stack: "z", borderRadius: 1, barPercentage: 0.7 })) },
+    options: { scales: { x: { ...axeX(), stacked: true }, y: { stacked: true, ticks: { callback: (v) => v + " h", maxTicksLimit: 5 } } },
+      plugins: { tooltip: { callbacks: { label: (it) => `${it.dataset.label} : ${nf(it.raw, 1)} h` } } } },
+  });
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-zsem]"); if (b) { S.ui.zsemPw = b.dataset.zsem === "pw"; rendreZonesSemaine(); } });
+
+// Répartition du temps par sport sur la période
+function rendreRepartSports() {
+  const el = $("#vol-repart"); if (!el) return;
+  const A = actsEntre(debutPlage(), S.today), tot = somme(A.map((a) => a.duree_s));
+  if (!tot) { el.innerHTML = ""; return; }
+  const P = ["Swim", "Ride", "Run", "Walk", "Other"].map((f) => [f, somme(A.filter((a) => fam(a.sport) === f).map((a) => a.duree_s))]).filter(([, s]) => s);
+  el.innerHTML = `<div class="repart">${P.map(([f, s]) => `<i style="flex:${s};background:${SPORTS[f].c}" title="${SPORTS[f].nom}"></i>`).join("")}</div>
+    <div class="repart-leg">${P.map(([f, s]) => `<span><b style="color:${SPORTS[f].c}">■</b> ${SPORTS[f].nom} ${nf((s / tot) * 100)} % · ${heures(s)}</span>`).join("")}</div>`;
+}
+
+// Détail d'une séance façon TrainingPeaks : courbes, sélection d'une portion, intervalles
+async function ouvrirDetail(id) {
+  const a = S.acts.find((x) => String(x.id) === String(id)); if (!a) return;
+  installerSeances();
+  const m = $("#modal-evt"); m.hidden = false;
+  m.innerHTML = `<div class="modal-boite detail-boite" role="dialog" aria-label="Détail de la séance">
+    <div class="cp-tete"><b>${esc(a.nom)} · ${D.fmt(a.date, { weekday: "short", day: "numeric", month: "short" })}</b><button type="button" data-fermer aria-label="Fermer">✕</button></div>
+    <div style="padding:14px 18px" id="det-corps"><p class="muted">Chargement des courbes…</p></div></div>`;
+  $("[data-fermer]", m).onclick = fermerModal;
+  m.onclick = (e) => { if (e.target === m) fermerModal(); };
+  const corps = $("#det-corps");
+  const stats = [["Durée", dureeFmt(a.duree_s)], ["Distance", a.distance_m ? dist(a.distance_m) : null], ["TSS", a.tss], ["IF", a.if != null ? nf(a.if, 2) : null], ["NP", a.np ? a.np + " W" : null],
+    ["Puiss. moy.", a.pmoy ? a.pmoy + " W" : null], ["FC moy.", a.fc ? a.fc + " bpm" : null], ["Allure", rythme(a)], ["D+", a.denivele_m ? a.denivele_m + " m" : null], ["Découplage", a.decouplage_brut != null ? a.decouplage_brut + " %" : null]]
+    .filter(([, v]) => v != null && v !== "").map(([n, v]) => `<span>${n} <b>${v}</b></span>`).join("");
+  try {
+    const r = await fetch(API + "?seance=" + encodeURIComponent(id), { headers: { "x-key": localStorage.getItem(CLE) || "" }, cache: "no-store" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "erreur " + r.status);
+    const T = d.temps_s || [], course = fam(a.sport) === "Run", nage = fam(a.sport) === "Swim";
+    const vit = (v) => (v == null || v <= 0 ? null : course ? 1000 / v : nage ? 100 / v : v * 3.6);
+    const libVit = course ? "Allure (s/km)" : nage ? "Allure (s/100 m)" : "Vitesse (km/h)";
+    const ds = [
+      d.puissance?.some((x) => x) && { label: "Puissance (W)", data: d.puissance, borderColor: "#7a5cf0", yAxisID: "y" },
+      d.fc?.some((x) => x) && { label: "FC (bpm)", data: d.fc, borderColor: "#e0483e", yAxisID: "y1" },
+      d.vitesse_ms?.some((x) => x) && { label: libVit, data: d.vitesse_ms.map(vit), borderColor: "#3b6cf0", yAxisID: "y2", hidden: !!d.puissance?.some((x) => x) && !course },
+      d.altitude?.some((x) => x) && { label: "Altitude (m)", data: d.altitude, borderColor: "rgba(140,145,155,.6)", backgroundColor: "rgba(140,145,155,.15)", fill: "origin", yAxisID: "y3" },
+    ].filter(Boolean).map((x) => ({ type: "line", borderWidth: 1.3, pointRadius: 0, tension: 0.2, spanGaps: true, ...x }));
+    const IV = (d.intervalles || []).filter((iv) => iv.duree_s);
+    corps.innerHTML = `<div class="det-stats">${stats}</div>
+      ${ds.length ? `<div class="g" style="height:${MOBILE ? 240 : 320}px"><canvas id="g-det"></canvas></div><p class="det-sel muted" id="det-sel">Glisse sur le graphique pour analyser une portion.</p>` : `<p class="muted">Pas de courbe pour cette séance.</p>`}
+      ${IV.length ? `<table class="det-iv"><thead><tr><th>Intervalle</th><th>Durée</th><th>Dist.</th><th>W moy.</th><th>NP</th><th>FC</th><th>${course || nage ? "Allure" : "Vitesse"}</th></tr></thead><tbody>${IV.map((iv, i) => `<tr class="${iv.type === "WORK" ? "work" : ""}" data-iv="${i}"><td>${esc(iv.nom || (iv.type === "WORK" ? "Effort" : "Récup"))}</td><td class="mono">${dureeFmt(iv.duree_s)}</td><td class="mono">${iv.distance_m ? dist(iv.distance_m, 2) : "–"}</td><td class="mono">${iv.puissance ?? "–"}</td><td class="mono">${iv.np ?? "–"}</td><td class="mono">${iv.fc ?? "–"}</td><td class="mono">${fmtVit(vit(iv.vitesse_ms), course || nage)}</td></tr>`).join("")}</tbody></table>` : ""}`;
+    if (!ds.length) return;
+    graph("g-det", { data: { labels: T.map((s) => dureeFmt(s)), datasets: ds },
+      options: { scales: { x: axeX(8), y: { display: ds.some((x) => x.yAxisID === "y"), position: "left" }, y1: { display: ds.some((x) => x.yAxisID === "y1"), position: "right", grid: { display: false } }, y2: { display: false, reverse: course || nage }, y3: { display: false } } } });
+    // Sélection d'une portion : moyenne de chaque courbe entre deux points
+    const sel = (i0, i1) => {
+      const moy = (arr) => { const x = (arr || []).slice(i0, i1 + 1).filter((v) => v != null && v > 0); return x.length ? somme(x) / x.length : null; };
+      const p = moy(d.puissance), f = moy(d.fc), v = moy(d.vitesse_ms), dm = d.distance_m ? (d.distance_m[i1] ?? 0) - (d.distance_m[i0] ?? 0) : null;
+      $("#det-sel").innerHTML = `Sélection <b class="mono">${dureeFmt((T[i1] ?? 0) - (T[i0] ?? 0))}</b>${dm > 0 ? ` · <b class="mono">${dist(dm, 2)}</b>` : ""}${p ? ` · <b class="mono">${Math.round(p)} W</b>` : ""}${f ? ` · <b class="mono">${Math.round(f)} bpm</b>` : ""}${v ? ` · <b class="mono">${fmtVit(vit(v), course || nage)}</b>` : ""}`;
+      $("#det-sel").classList.remove("muted");
+    };
+    const cv = $("#g-det"); let i0 = null;
+    const idx = (e) => CH["g-det"]?.getElementsAtEventForMode(e, "index", { intersect: false }, false)[0]?.index;
+    cv.onpointerdown = (e) => { i0 = idx(e); };
+    cv.onpointerup = (e) => { const i1 = idx(e); if (i0 != null && i1 != null && i0 !== i1) sel(Math.min(i0, i1), Math.max(i0, i1)); i0 = null; };
+    $$("tr[data-iv]", corps).forEach((tr) => tr.addEventListener("click", () => {
+      const iv = IV[Number(tr.dataset.iv)]; if (iv.debut_s == null) return;
+      const a0 = T.findIndex((s) => s >= iv.debut_s), a1 = T.findIndex((s) => s >= iv.debut_s + iv.duree_s);
+      if (a0 >= 0) sel(a0, a1 > a0 ? a1 : T.length - 1);
+    }));
+  } catch (e) {
+    corps.innerHTML = `<div class="det-stats">${stats}</div><p class="muted">Courbes indisponibles (${esc(e.message)}).</p>`;
+  }
+}
+const fmtVit = (v, allure) => (v == null ? "–" : allure ? mmss(v) : nf(v, 1) + " km/h");
+document.addEventListener("click", (e) => { const v = e.target.closest("[data-voir]"); if (v && !CMP?.actif) { e.preventDefault(); e.stopPropagation(); ouvrirDetail(v.dataset.voir); } }, true);
+document.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("[data-voir]")) { e.preventDefault(); ouvrirDetail(e.target.dataset.voir); } });
 
 const metJour = (j) => {
   if (j > S.today) return "";
@@ -2569,11 +2717,13 @@ function resumeSemaine(l) {
     const p = prevu ? Math.min(100, Math.round((fait / prevu) * 100)) : 100;
     return `<div class="sr-sp"><span>${SPORTS[f].nom}</span><span class="mono">${fait ? dureeFmt(fait) : "0"}${prevu ? " / " + dureeFmt(prevu) : ""}</span><i style="--c:${SPORTS[f].c};--p:${p}%"></i></div>`;
   }).join("");
+  const cible = cibleSemaine(l), tssFait = somme(A.map((a) => a.tss));
+  const obj = cible ? `<div class="sr-sp" title="Charge visée par tes blocs de saison"><span>Objectif TSS</span><span class="mono">${nf(tssFait)} / ${nf(cible)}</span><i style="--c:${tssFait > cible * 1.1 ? "#e8853a" : "#3b6cf0"};--p:${Math.min(100, Math.round((tssFait / cible) * 100))}%"></i></div>` : "";
   const km = (f) => somme(A.filter((a) => fam(a.sport) === f).map((a) => a.distance_m));
   const tot = [["Durée", somme(A.map((a) => a.duree_s)), heures], ["TSS", somme(A.map((a) => a.tss)), nf], ["Nat.", km("Swim"), (m) => nf(m) + " m"],
     ["Vélo", km("Ride"), dist], ["Course", km("Run"), dist], ["D+", somme(A.map((a) => a.denivele_m)), (m) => nf(m) + " m"], ["Travail", somme(A.map((a) => a.kj)), (k) => nf(k) + " kJ"]]
     .filter(([, v]) => v > 0).map(([n, v, f]) => `<span>${n} <b>${f(v)}</b></span>`).join("");
-  return pmc || sp || tot ? `<div class="sem-resume">${pmc}${sp}${tot ? `<div class="sr-tot mono">${tot}</div>` : ""}</div>` : "";
+  return pmc || sp || tot || obj ? `<div class="sem-resume">${pmc}${obj}${sp}${tot ? `<div class="sr-tot mono">${tot}</div>` : ""}</div>` : "";
 }
 
 function rendrePlan() {
@@ -2598,12 +2748,12 @@ function rendrePlan() {
     const ph = phaseDu(l < t ? t : l) || phaseDu(D.add(l, 6));
     html += `<div class="semaine">
       <div class="sem-tete"><span class="mono-lab fort">${titre}</span><span class="muted">${D.court(l)} – ${D.court(D.add(l, 6))}</span>${ph ? `<span class="tag-ph">${ph}</span>` : ""}
-        <span class="sem-tot mono">TOTAL <b>${heures(somme(Object.values(tot)))}</b>${Object.keys(tot).filter((k) => tot[k]).map((k) => ` ${SPORTS[k].nom.toLowerCase()} <b>${heures(tot[k])}</b>`).join("")}</span></div>
+        ${(() => { const ids = S.evts.filter((e) => e.categorie === "WORKOUT" && e.date >= l && e.date <= D.add(l, 6)).map((e) => e.id); return ids.length && l >= D.add(D.lundi(t), -28) ? `<button type="button" class="btn sem-copier" data-copier="${ids.join(",")}" data-lundi="${l}">Copier → semaine suivante</button>` : ""; })()}<span class="sem-tot mono">TOTAL <b>${heures(somme(Object.values(tot)))}</b>${Object.keys(tot).filter((k) => tot[k]).map((k) => ` ${SPORTS[k].nom.toLowerCase()} <b>${heures(tot[k])}</b>`).join("")}</span></div>
       <div class="sem-corps"><div class="jours ${S.ui.planMode === "month" ? "compact" : ""}">${J.map((j) => {
         const it = pairer(j), cj = coursesDu(j);
         return `<div class="jour ${j === t ? "auj" : ""} ${j < t ? "passe" : ""}" data-jour="${j}">
           <div class="j-tete"><span class="mono">${D.fmt(j, { weekday: "short" }).replace(".", "").toUpperCase()}</span> <b>${D.fmt(j, { day: "numeric" })}</b>${MOBILE ? ` <span class="muted">${D.fmt(j, { month: "short" })}</span>` : ""}${j === t ? '<span class="tag-l">AUJ.</span>' : ""}</div>
-          <div class="j-seances">${metJour(j)}${cj.map((c) => `<div class="seance s-course p-${c.priorite}"><div class="s-tete"><span class="s-sport">COURSE ${c.priorite}</span></div><div class="s-nom"><b>${esc(c.nom)}</b></div><div class="s-p">${esc(c.sport || "")}${c.distance ? " · " + esc(c.distance) : ""}</div></div>`).join("")}${it.length ? it.map((x) => carteSeance(x, j)).join("") : cj.length ? "" : '<div class="vide">—</div>'}</div>
+          <div class="j-seances">${metJour(j)}${S.evts.filter((n) => n.categorie === "NOTE" && n.date === j).map((n) => `<div class="seance s-note"><b>📝 ${esc(n.nom)}</b>${n.description ? `<div>${esc(n.description.split("\n")[0]).slice(0, 90)}</div>` : ""}</div>`).join("")}${cj.map((c) => `<div class="seance s-course p-${c.priorite}"><div class="s-tete"><span class="s-sport">COURSE ${c.priorite}</span></div><div class="s-nom"><b>${esc(c.nom)}</b></div><div class="s-p">${esc(c.sport || "")}${c.distance ? " · " + esc(c.distance) : ""}</div></div>`).join("")}${it.length ? it.map((x) => carteSeance(x, j)).join("") : cj.length ? "" : '<div class="vide">—</div>'}</div>
         </div>`;
       }).join("")}</div>${resumeSemaine(l)}</div></div>`;
   }
@@ -2644,7 +2794,7 @@ async function charger() {
 const RENDUS = [rendreEntete, rendreKpis, rendreDecision, rendreReadiness, rendreDrapeau, rendreEquilibre, rendreZones, rendreJournal,
   rendreGlissant, rendrePmc, rendreVolume, rendreAllure, rendreEfficacite, rendreRepartition, rendreZonesRep, rendrePuissance,
   rendreBienEtre, rendreDeuxHrv, rendrePoids, rendreCourse, rendreArc, rendrePlan,
-  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel, rendreBriquesRessenti, rendrePics];
+  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel, rendreBriquesRessenti, rendrePics, rendreZonesSemaine, rendreRepartSports];
 
 function toutRendre() {
   if (!S.d) return;
@@ -5113,6 +5263,10 @@ const montrerCarte = (c) => {
   if (tests) { const c = carte("c-records", "Records et seuils"); (tests.closest(".grille2") || tests).after(c); }
   $("#c-power")?.closest(".carte")?.after(carte("c-pics", "Performances de pointe", '<div class="seg seg-mini"><button data-pics-vie="0">Période</button><button data-pics-vie="1">À vie</button></div>'));
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-pics-vie]"); if (b) { S.ui.picsVie = b.dataset.picsVie === "1"; rendrePics(); } });
+  const zs = carte("c-zsem", "Temps en zones par semaine", '<div class="seg seg-mini"><button data-zsem="fc">FC</button><button data-zsem="pw">Puissance</button></div>');
+  $(".xt-corps", zs).innerHTML = '<div class="g" style="height:260px"><canvas id="g-zsem"></canvas></div>';
+  ($("#g-intensite") || $("#g-volume"))?.closest(".carte")?.after(zs);
+  const rp = document.createElement("div"); rp.id = "vol-repart"; $("#g-volume")?.closest(".g")?.before(rp);
   $("#c-pred")?.closest(".carte")?.after(carte("c-fiche", "Fiche de course", '<button type="button" class="btn" data-imprimer-fiche>Imprimer</button>'));
   // Chaleur : case à cocher dans la carte « Zones du jour » (indicatif, ne modifie rien)
   const z = $("#c-zones");
