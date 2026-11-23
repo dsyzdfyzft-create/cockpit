@@ -2172,8 +2172,10 @@ function calculerBlocs(t, obj, courses, lieux) {
   const pousse = (type, nom, du, au, th) => {
     if (au < t || du > au) return;
     const d = du < t ? t : du;
-    if (diff(au, d) < 6 && !["specifique", "affutage"].includes(type)) { absorbe = true; return; }
-    blocs.push({ type, nom, du: absorbe ? t : d, au, ...th, c: COUL[type][0], tc: COUL[type][1] }); absorbe = false;
+    if (diff(au, d) < 6 && !["specifique", "affutage"].includes(type)) { absorbe = du; return; }
+    // debut = vraie date de début du bloc (ne recule pas à aujourd'hui chaque jour) ; du reste borné à aujourd'hui pour les calculs
+    // shortcut: un bout de Base absorbé démarre « aujourd'hui » (la Base n'a pas de début fixe)
+    blocs.push({ type, nom, du: absorbe ? t : d, debut: absorbe || du, au, ...th, c: COUL[type][0], tc: COUL[type][1] }); absorbe = false;
   };
   const LONGUEURS = [["dev1", 8], ["dev2", 8], ["dev3", 9]];
   let fin = devFin; const devs = [];
@@ -2773,7 +2775,7 @@ function rendreStatsPeriode() {
   } else {
     let B = []; try { B = blocsSaison().blocs || []; } catch (e) {}
     // Blocs passés et en cours, puis les mois avant le premier bloc
-    for (const b of B.filter((b) => b.du <= t).reverse()) P.push({ lab: b.nom, de: b.du, a: b.au < t ? b.au : t });
+    for (const b of B.filter((b) => b.du <= t).reverse()) P.push({ lab: b.nom, de: b.debut || b.du, a: b.au < t ? b.au : t });
     if (!P.length) return void (el.innerHTML = '<p class="muted petit">Pas encore de bloc commencé : passe en vue « Mois ».</p>');
   }
   const lig = P.map((p) => {
@@ -3601,7 +3603,7 @@ function rendreSaison() {
   const listeBlocs = [...BS.blocs, ...BS.surcouches].filter((b) => b.au >= S.today).sort((a, b) => a.du.localeCompare(b.du) || a.au.localeCompare(b.au)).map((b) => {
     const enCours = b.du <= S.today && b.au >= S.today;
     const th = [["Course", b.course], ["Vélo", b.velo], ["Natation", b.natation]].filter((x) => x[1]).map(([k, v]) => `<span><b>${k}</b>${esc(v)}</span>`).join("");
-    return `<div class="bloc-l${enCours ? " en-cours" : ""}${BS.surcouches.includes(b) ? " surcouche" : ""}" style="--c:${b.tc};border-left-color:${b.tc};background:${b.c}"><div class="bloc-t"><b>${esc(b.nom)}</b>${["dev1", "dev2", "dev3"].includes(b.type) ? `<span>${esc(b.titre)}</span>` : ""}${enCours ? '<span class="tag-l">EN COURS</span>' : ""}<span class="mono petit">${D.court(b.du)} – ${D.court(b.au)}</span></div><div class="bloc-th">${th}</div>${enCours ? progBloc(b) : ""}</div>`;
+    return `<div class="bloc-l${enCours ? " en-cours" : ""}${BS.surcouches.includes(b) ? " surcouche" : ""}" style="--c:${b.tc};border-left-color:${b.tc};background:${b.c}"><div class="bloc-t"><b>${esc(b.nom)}</b>${["dev1", "dev2", "dev3"].includes(b.type) ? `<span>${esc(b.titre)}</span>` : ""}${enCours ? '<span class="tag-l">EN COURS</span>' : ""}<span class="mono petit">${D.court(b.debut || b.du)} – ${D.court(b.au)}</span></div><div class="bloc-th">${th}</div>${enCours ? progBloc(b) : ""}</div>`;
   }).join("");
   const legeresTxt = BS.legeres.filter((l) => D.add(l, 6) >= S.today).map((l) => D.court(l)).join(" · ");
 
@@ -4279,7 +4281,7 @@ const MOINS_ANIM = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // 8. Barre de progression du bloc en cours (frise de saison)
 function progBloc(b) {
-  const total = D.diff(b.au, b.du) + 1, fait = Math.min(total, Math.max(1, D.diff(S.today, b.du) + 1));
+  const de = b.debut || b.du, total = D.diff(b.au, de) + 1, fait = Math.min(total, Math.max(1, D.diff(S.today, de) + 1));
   const reste = total - fait;
   return `<div class="bloc-prog"><i style="width:${Math.round((fait / total) * 100)}%"></i></div><div class="bloc-prog-t mono">Tu es ici · jour ${fait} sur ${total}${reste ? ` · encore ${reste} j` : " · dernier jour"}</div>`;
 }
