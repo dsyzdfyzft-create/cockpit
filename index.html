@@ -52,9 +52,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .carte-titre { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--ligne); }
 .carte-titre h3 { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.01em; }
 /* Heatmap d'entraînement : une case par jour */
-.heat { display: grid; grid-template-rows: auto repeat(7, auto); grid-template-columns: auto; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
-.heat span { font: 500 10.5px var(--mono); color: var(--texte3); white-space: nowrap; align-self: center; padding-right: 6px; overflow: visible; width: 0; }
-.heat span.j { width: auto; }
+.heat { display: grid; grid-template-rows: repeat(7, auto); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
 :is(.heat, .heat-leg) i { aspect-ratio: 1; border-radius: 2px; background: var(--piste); }
 :is(.heat, .heat-leg) i.n1 { background: color-mix(in srgb, var(--course) 30%, var(--piste)); }
 :is(.heat, .heat-leg) i.n2 { background: color-mix(in srgb, var(--course) 55%, var(--piste)); }
@@ -3623,16 +3621,9 @@ function rendreChargeAvancee() {
       if (j > S.today) return `<i class="futur"></i>`;
       const v = chargeJour(j), sp = [...new Set(S.acts.filter((a) => a.date === j).map((a) => a.sport))].join(", ");
       return `<i class="n${niv(v)}" title="${D.fmt(j, { weekday: "short", day: "numeric", month: "short" })} · ${v ? `${Math.round(v)} TSS · ${esc(sp)}` : "repos"}"></i>`;
-    });
-    const passes = J26.filter((j) => j <= S.today);
-    // Repères : jours à gauche, mois au-dessus de la semaine qui contient le 1er
-    const joursLab = `<span></span>` + ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"].map((x) => `<span class="j">${x}</span>`).join("");
-    const semaines = Array.from({ length: 26 }, (_, k) => {
-      const l = J26[k * 7], mois = k === 0 || jours(l, D.add(l, 6)).some((j) => j.endsWith("-01"));
-      const finMois = jours(l, D.add(l, 6)).find((j) => j.endsWith("-01")) || l;
-      return `<span>${mois ? D.fmt(finMois, { month: "short" }).replace(".", "") : ""}</span>` + cases.slice(k * 7, k * 7 + 7).join("");
     }).join("");
-    $("#c-heat").innerHTML = `<div class="heat" role="img" aria-label="Charge quotidienne sur 26 semaines">${joursLab}${semaines}</div>
+    const passes = J26.filter((j) => j <= S.today);
+    $("#c-heat").innerHTML = `<div class="heat" role="img" aria-label="Charge quotidienne sur 26 semaines">${cases}</div>
       <div class="heat-leg mono-lab">moins <i></i><i class="n1"></i><i class="n2"></i><i class="n3"></i><i class="n4"></i> plus</div>`;
     $("#heat-resume").textContent = `${tri.length} jours actifs sur ${passes.length}`;
   }
