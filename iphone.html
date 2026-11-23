@@ -867,6 +867,8 @@ table.det-iv tr[data-iv] { cursor: pointer; }
 table.pics { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
 table.pics th { text-align: left; font-weight: 500; color: var(--doux); width: 70px; }
 table.pics th, table.pics td { padding: 6px 4px; border-bottom: 1px solid var(--ligne); }
+table.pics td[data-voir] { cursor: pointer; border-radius: 6px; }
+table.pics td[data-voir]:hover { background: var(--ligne); }
 </style>
 </head>
 <body>
@@ -2579,7 +2581,7 @@ function rendrePics() {
     const L = Object.entries(g).filter(([k]) => k.startsWith(sp + "|" + me + "|"));
     if (!L.length) return "";
     return `<h4>${SPORTS[sp].nom} · ${NOMS[me]}</h4><table class="pics"><tbody>${L.map(([k, ps]) => `<tr><th>${esc(k.split("|")[2])}</th>${ps.slice(0, 3).map((p, i) =>
-      `<td title="${esc(S.acts.find((a) => String(a.id) === p.id)?.nom || "")}">${["🥇", "🥈", "🥉"][i]} <b class="mono">${val(p)}</b> <span class="muted petit">${D.court(p.date)}${p.date.slice(0, 4) !== S.today.slice(0, 4) ? " " + p.date.slice(0, 4) : ""}</span></td>`).join("")}${g1 ? (() => {
+      `<td${(() => { const a = S.acts.find((x) => String(x.id) === p.id); return a ? ` data-voir="${esc(p.id)}" tabindex="0" role="button" title="${esc(a.nom)} : voir la séance"` : ""; })()}>${["🥇", "🥈", "🥉"][i]} <b class="mono">${val(p)}</b> <span class="muted petit">${D.court(p.date)}${p.date.slice(0, 4) !== S.today.slice(0, 4) ? " " + p.date.slice(0, 4) : ""}</span></td>`).join("")}${g1 ? (() => {
       const avant = g1[k]?.[0]; if (!avant) return `<td class="muted petit">il y a 1 an : –</td>`;
       const d = ((ps[0].v - avant.v) / avant.v) * 100 * (me === "allure" ? -1 : 1);
       return `<td class="petit">il y a 1 an : <b class="mono">${val(avant)}</b> <span class="${d >= 0 ? "xt-ok" : "xt-att"}">${d >= 0 ? "+" : ""}${nf(d, 1)} %</span></td>`;
