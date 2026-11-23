@@ -52,16 +52,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .carte { background: var(--surface); border: 1px solid var(--ligne); border-radius: 6px; padding: 22px 24px; min-width: 0; }
 .carte-titre { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--ligne); }
 .carte-titre h3 { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.01em; }
-/* Heatmap d'entraînement : une case par jour */
-.heat { display: grid; grid-template-rows: repeat(7, auto); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
-:is(.heat, .heat-leg) i { aspect-ratio: 1; border-radius: 2px; background: var(--piste); }
-:is(.heat, .heat-leg) i.n1 { background: color-mix(in srgb, var(--course) 30%, var(--piste)); }
-:is(.heat, .heat-leg) i.n2 { background: color-mix(in srgb, var(--course) 55%, var(--piste)); }
-:is(.heat, .heat-leg) i.n3 { background: color-mix(in srgb, var(--course) 80%, var(--piste)); }
-:is(.heat, .heat-leg) i.n4 { background: var(--course); }
-.heat i.futur { visibility: hidden; }
-.heat-leg { display: flex; align-items: center; gap: 3px; justify-content: flex-end; margin-top: 10px; }
-.heat-leg i { width: 11px; height: 11px; }
 .sources { font: 500 10.5px var(--mono); letter-spacing: 0.08em; color: var(--doux); display: flex; gap: 12px; flex-wrap: wrap; }
 .sources i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
 .c-tete { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -917,7 +907,6 @@ h1, h2, h3, .marque { font-family: var(--titre); }
         <div class="carte"><div class="carte-titre"><h3>Vue glissante</h3></div><div id="c-rolling"></div></div>
         <div class="carte"><div class="carte-titre"><h3>Forme, fatigue, fraîcheur</h3><label class="muted petit"><input type="checkbox" id="chk-eftp" checked> eFTP</label></div><div class="g" style="height:240px"><canvas id="g-pmc"></canvas></div><div class="legende"><span><i style="background:#3b6cf0"></i>CTL</span><span><i style="background:#e0483e"></i>ATL</span><span><i style="background:#3faa6f"></i>TSB</span><span><i class="bar" style="background:#b9bdc4"></i>Charge</span><span><i class="pt" style="color:#e8973a"></i>eFTP</span></div></div>
         <div class="carte"><div class="carte-titre"><h3>Volume</h3><div class="seg seg-mini"><button data-vol="time">Temps</button><button data-vol="dist">Dist.</button></div></div><div class="ctrl"><div class="chips" id="vol-sports"></div></div><div class="g" style="height:230px"><canvas id="g-volume"></canvas></div></div>
-        <div class="carte"><div class="carte-titre"><h3>Calendrier d'entraînement</h3><span class="muted petit" id="heat-resume"></span></div><div id="c-heat"></div></div>
         <div class="carte"><div class="carte-titre"><h3>Ratio de charge</h3></div><div class="g" style="height:200px"><canvas id="g-acwr"></canvas></div><p class="note">Charge des 7 derniers jours rapportée à celle des 28. Bande verte de 0,8 à 1,3.</p></div>
         <div class="carte"><div class="carte-titre"><h3>Monotonie et strain</h3></div><div class="g" style="height:200px"><canvas id="g-mono"></canvas></div><p class="note">Monotonie : charge moyenne du jour ÷ écart-type sur 7 jours. Au-dessus de 2, les journées se ressemblent trop.</p></div>
         <div class="carte"><div class="carte-titre"><h3>Découplage aérobie</h3></div><div class="g" style="height:200px"><canvas id="g-decouplage"></canvas></div><p class="note">Sous 5 % : bonne endurance de fond.</p></div>
@@ -3621,21 +3610,6 @@ function rendreRadars() {
 // ---------- 3. Charge : ACWR, monotonie et strain, découplage ----------
 function rendreChargeAvancee() {
   const debut = debutPlage(), J = jours(debut, S.today);
-  if ($("#c-heat")) {
-    // 26 semaines, du lundi au dimanche ; intensité = quartile de la charge parmi les jours actifs
-    const J26 = jours(D.add(D.lundi(S.today), -25 * 7), D.add(D.lundi(S.today), 6));
-    const tri = J26.map(chargeJour).filter((v) => v > 0).sort((a, b) => a - b);
-    const niv = (v) => (v <= 0 ? 0 : 1 + Math.min(3, Math.floor((tri.findIndex((x) => x >= v) / tri.length) * 4)));
-    const cases = J26.map((j) => {
-      if (j > S.today) return `<i class="futur"></i>`;
-      const v = chargeJour(j), sp = [...new Set(S.acts.filter((a) => a.date === j).map((a) => a.sport))].join(", ");
-      return `<i class="n${niv(v)}" title="${D.fmt(j, { weekday: "short", day: "numeric", month: "short" })} · ${v ? `${Math.round(v)} TSS · ${esc(sp)}` : "repos"}"></i>`;
-    }).join("");
-    const passes = J26.filter((j) => j <= S.today);
-    $("#c-heat").innerHTML = `<div class="heat" role="img" aria-label="Charge quotidienne sur 26 semaines">${cases}</div>
-      <div class="heat-leg mono-lab">moins <i></i><i class="n1"></i><i class="n2"></i><i class="n3"></i><i class="n4"></i> plus</div>`;
-    $("#heat-resume").textContent = `${tri.length} jours actifs sur ${passes.length}`;
-  }
   if ($("#g-acwr")) {
     const acwr = J.map((j) => { const a = moy(jours(D.add(j, -6), j).map(chargeJour)), c = moy(jours(D.add(j, -27), j).map(chargeJour)); return c > 0 ? Math.round((a / c) * 100) / 100 : null; });
     graph("g-acwr", { type: "line", data: { labels: J.map(D.court), datasets: [
