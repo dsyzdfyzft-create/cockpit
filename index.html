@@ -761,6 +761,22 @@ h2.sec { font-size: 1.6rem; letter-spacing: -0.02em; margin: 54px 0 0; padding-b
 }
 h1, h2, h3, .marque { font-family: var(--titre); }
 .ico { width: 1em; height: 1em; vertical-align: -0.14em; flex: none; }
+/* Calendrier façon TrainingPeaks : métriques du jour, résumé de semaine, performances de pointe */
+.j-met { font-size: 11px; color: var(--doux); margin: -4px 0 8px; }
+.sem-corps { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 10px; align-items: start; }
+@media (max-width: 1000px) { .sem-corps { grid-template-columns: minmax(0, 1fr); } }
+.sem-resume { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; border: 1px solid var(--ligne); border-radius: 6px; font-size: 12.5px; }
+.sr-pmc { display: flex; justify-content: space-between; color: var(--doux); text-align: center; }
+.sr-pmc span { display: flex; flex-direction: column; font-size: 11px; }
+.sr-pmc b { font-size: 15px; }
+.sr-tot { display: flex; flex-direction: column; gap: 3px; color: var(--doux); }
+.sr-tot span { display: flex; justify-content: space-between; }
+.sr-pmc b, .sr-tot b { color: var(--encre); }
+.sr-sp { display: grid; grid-template-columns: auto auto; gap: 2px 10px; min-width: 140px; }
+.sr-sp i { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--c) var(--p), var(--ligne) 0); }
+table.pics { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
+table.pics th { text-align: left; font-weight: 500; color: var(--doux); width: 70px; }
+table.pics th, table.pics td { padding: 6px 4px; border-bottom: 1px solid var(--ligne); }
 </style>
 </head>
 <body>
@@ -823,7 +839,7 @@ h1, h2, h3, .marque { font-family: var(--titre); }
       <!-- Charge -->
       <section class="sous-vue" data-sv="charge" hidden>
         <div class="carte " ><div class="carte-titre"><h3>Vue glissante</h3></div><div id="c-rolling"></div></div>
-        <div class="carte " ><div class="carte-titre"><h3>Forme, fatigue, fraîcheur</h3><label class="muted petit"><input type="checkbox" id="chk-eftp" checked> eFTP</label></div><div class="g" style="height:300px"><canvas id="g-pmc"></canvas></div><div class="legende"><span><i style="background:#3b6cf0"></i>Forme (CTL)</span><span><i style="background:#e0483e"></i>Fatigue (ATL)</span><span><i style="background:#3faa6f"></i>Fraîcheur (TSB)</span><span><i class="bar" style="background:#b9bdc4"></i>Charge du jour</span><span><i class="pt" style="color:#e8973a"></i>eFTP</span></div></div>
+        <div class="carte " ><div class="carte-titre"><h3>Forme, fatigue, fraîcheur</h3><label class="muted petit"><input type="checkbox" id="chk-eftp" checked> eFTP</label></div><div class="g" style="height:300px"><canvas id="g-pmc"></canvas></div><div class="legende"><span><i style="background:#3b6cf0"></i>Forme (CTL)</span><span><i style="background:#e0483e"></i>Fatigue (ATL)</span><span><i style="background:#3faa6f"></i>Fraîcheur (TSB)</span><span><i class="bar" style="background:#b9bdc4"></i>Charge du jour</span><span><i class="pt" style="color:#e8973a"></i>eFTP</span><span><i style="background:repeating-linear-gradient(90deg,#3b6cf0 0 4px,transparent 4px 8px)"></i>Prévu (séances planifiées)</span></div></div>
         <div class="carte " ><div class="carte-titre"><h3>Volume d'entraînement</h3><div class="seg seg-mini"><button data-vol="time">Temps</button><button data-vol="dist">Distance</button></div></div><div class="ctrl"><div class="chips" id="vol-sports"></div></div><div class="g" style="height:280px"><canvas id="g-volume"></canvas></div></div>
         <div class="grille3">
           <div class="carte " ><div class="carte-titre"><h3>Ratio de charge</h3></div><div class="g" style="height:220px"><canvas id="g-acwr"></canvas></div><p class="note">ACWR : charge des 7 derniers jours rapportée à celle des 28. Bande verte de 0,8 à 1,3 ; au-dessus de 1,5, le risque de blessure augmente.</p></div>
@@ -1088,6 +1104,18 @@ function prep(d) {
   for (const w of S.well) if (!S.sommeil.has(w.date) && w.sommeil_s) S.sommeil.set(w.date, w.sommeil_s / 60);
 
   S.evts = (d.evenements || []).filter((e) => e.date);
+  // Performances de pointe : une ligne par séance et par repère (vélo 5 s…60 min en W, course 400 m…10 km en s)
+  S.pics = [];
+  const lab = (mesure, r) => (mesure === "allure" ? (r < 1000 ? r + " m" : r / 1000 + " km") : r < 60 ? r + " s" : r / 60 + " min");
+  for (const b of Array.isArray(d.pics) ? d.pics : []) (b.seances || []).forEach((c) => (c.v || []).forEach((v, i) => {
+    const r = b.reperes?.[i];
+    if (v > 0 && r) S.pics.push({ id: String(c.id), date: c.date, sport: b.sport, mesure: b.mesure, cle: lab(b.mesure, r), r, v });
+  }));
+  // Médailles du calendrier : 🏅 = top 3 sur 12 mois, 🏆 = record à vie battu pendant la séance
+  S.medailles = new Map(); S.trophees = new Map();
+  const plus = (m, id) => m.set(id, (m.get(id) || 0) + 1);
+  for (const L of Object.values(classerPics(D.add(S.today, -365)))) L.slice(0, 3).forEach((p) => plus(S.medailles, p.id));
+  for (const L of Object.values(classerPics(""))) plus(S.trophees, L[0].id);
   S.obj = d.objectif || null;
   if (S.obj && !S.obj.sport) S.obj.sport = S.obj.type === "TRI" ? "Triathlon" : S.obj.type;
   S.courses = (d.courses || []).filter((c) => c.date).sort((a, b) => a.date.localeCompare(b.date));
@@ -1525,12 +1553,33 @@ function rendrePmc() {
   // eFTP du jour = meilleure estimation des 42 jours précédents (comme Intervals), sinon FTP réglée
   const serieFtp = J.map((j) => { const v = eftps.filter((a) => a.date <= j && a.date > D.add(j, -42)).map((a) => a.eftp); return v.length ? Math.max(...v) : S.prof.ftp; });
   const maxCharge = Math.max(10, ...J.map(chargeJour));
-  const w = J.map((j) => S.wellMap.get(j));
+  // Projection façon TrainingPeaks : on prolonge forme et fatigue avec le TSS des séances prévues
+  const prevus = S.evts.filter((e) => e.categorie === "WORKOUT" && e.date > S.today && e.tss);
+  const finPrev = prevus.length ? prevus.map((e) => e.date).sort().at(-1) : null;
+  const w0 = S.wellMap.get(S.today) || S.well.at(-1), proj = new Map();
+  if (finPrev && w0?.ctl != null && w0?.atl != null) {
+    let ctl = w0.ctl, atl = w0.atl;
+    proj.set(S.today, { ctl, atl });
+    for (const j of jours(D.add(S.today, 1), finPrev)) {
+      const tss = somme(prevus.filter((e) => e.date === j).map((e) => e.tss));
+      ctl += (tss - ctl) / 42; atl += (tss - atl) / 7;
+      proj.set(j, { ctl, atl, tss });
+      J.push(j); serieFtp.push(null);
+    }
+  }
+  const w = J.map((j) => (j <= S.today ? S.wellMap.get(j) : null));
+  const pj = (f) => J.map((j) => { const p = proj.get(j); return p ? Math.round(f(p) * 10) / 10 : null; });
   const ds = [
+    ...(proj.size ? [
+      { type: "line", label: "Forme prévue", data: pj((p) => p.ctl), borderColor: C.ctl, borderDash: [4, 4], borderWidth: 1.8, pointRadius: 0, yAxisID: "y", order: 1 },
+      { type: "line", label: "Fatigue prévue", data: pj((p) => p.atl), borderColor: C.atl, borderDash: [4, 4], borderWidth: 1.4, pointRadius: 0, yAxisID: "y", order: 2 },
+      { type: "line", label: "Fraîcheur prévue", data: pj((p) => p.ctl - p.atl), borderColor: C.tsb, borderDash: [4, 4], borderWidth: 1.4, pointRadius: 0, yAxisID: "y", order: 3 },
+      { type: "bar", label: "Charge prévue", data: J.map((j) => proj.get(j)?.tss || null), backgroundColor: "rgba(150,155,165,0.35)", borderRadius: 1, barPercentage: 0.6, yAxisID: "y2", order: 4 },
+    ] : []),
     { type: "line", label: "Forme (CTL)", data: w.map((x) => x?.ctl ?? null), borderColor: C.ctl, borderWidth: 2.2, pointRadius: 0, tension: 0.35, spanGaps: true, yAxisID: "y", order: 1 },
     { type: "line", label: "Fatigue (ATL)", data: w.map((x) => x?.atl ?? null), borderColor: C.atl, borderWidth: 1.8, pointRadius: 0, tension: 0.35, spanGaps: true, yAxisID: "y", order: 2 },
     { type: "line", label: "Fraîcheur (TSB)", data: w.map((x) => (x?.ctl != null && x?.atl != null ? Math.round((x.ctl - x.atl) * 10) / 10 : null)), borderColor: C.tsb, backgroundColor: "rgba(63,170,111,0.06)", fill: "origin", borderWidth: 1.8, pointRadius: 0, tension: 0.35, spanGaps: true, yAxisID: "y", order: 3 },
-    { type: "bar", label: "Charge du jour", data: J.map((j) => chargeJour(j) || null), backgroundColor: C.barre, borderRadius: 1, barPercentage: 0.6, yAxisID: "y2", order: 4 },
+    { type: "bar", label: "Charge du jour", data: J.map((j) => (j <= S.today ? chargeJour(j) || null : null)), backgroundColor: C.barre, borderRadius: 1, barPercentage: 0.6, yAxisID: "y2", order: 4 },
   ];
   if (S.ui.eftp) ds.push({ type: "line", label: "eFTP 42 j (W)", data: serieFtp, borderColor: C.ftp, borderDash: [5, 4], borderWidth: 1.6, pointRadius: 0, stepped: true, yAxisID: "y1", order: 0 });
   graph("g-pmc", { legende: false,
@@ -2460,11 +2509,62 @@ function carteSeance({ e, a }, jour) {
   return `<div class="seance ${fond} ${cls === "b-hors" ? "hors" : ""} ${modifiable ? "modif" : ""}" style="--c:${coul}" ${modifiable ? `data-evt="${esc(e.id)}" role="button" tabindex="0" title="Modifier la séance"` : ""}>
     <div class="s-tete"><span class="s-sport" style="color:${coul}">${SPORTS[f].nom.toUpperCase()}</span>${badge ? `<span class="sb ${cls}">${badge}</span>` : `<span class="s-duree">${e?.couleur ? `<i class="pz" style="background:${esc(e.couleur)}"></i>` : ""}${e?.heure ? e.heure + " · " : ""}${e?.duree_s ? dureeFmt(e.duree_s) : ""}</span>`}</div>
     <div class="s-nom">${esc(e?.nom || a?.nom)}</div>
-    ${a ? `<div class="s-m mono">${dureeFmt(a.duree_s)}${a.distance_m ? " · " + dist(a.distance_m) : ""}</div>` : ""}
+    ${a ? `<div class="s-m mono">${dureeFmt(a.duree_s)}${a.distance_m ? " · " + dist(a.distance_m) : ""}${a.tss ? " · " + a.tss + " TSS" : ""}${S.trophees?.get(String(a.id)) ? ` · <span title="Records à vie battus">🏆${S.trophees.get(String(a.id))}</span>` : ""}${S.medailles?.get(String(a.id)) ? ` · <span title="Performances de pointe : top 3 sur 12 mois">🏅${S.medailles.get(String(a.id))}</span>` : ""}</div>` : ""}
     ${e && a && e.duree_s ? `<div class="s-p">· prévu ${dureeFmt(e.duree_s)}</div>` : ""}
     ${pastilleChaussure(e, a)}
     ${!a && e?.description && sansChaussure(e.description) ? `<div class="s-p">${esc(sansChaussure(e.description).split("\n")[0]).slice(0, 70)}</div>` : ""}
   </div>`;
+}
+
+// ---------- Performances de pointe (façon TrainingPeaks) ----------
+// Groupes « sport|repère » triés du meilleur au moins bon, séances depuis `de`
+function classerPics(de) {
+  const g = {};
+  for (const p of S.pics || []) if (p.date >= de) (g[p.sport + "|" + p.mesure + "|" + p.cle] ||= []).push(p);
+  for (const L of Object.values(g)) L.sort((a, b) => (a.mesure === "allure" ? a.v - b.v : b.v - a.v));
+  return g;
+}
+function rendrePics() {
+  const el = $("#c-pics .xt-corps"); if (!el) return;
+  $$("[data-pics-vie]").forEach((b) => b.classList.toggle("on", (b.dataset.picsVie === "1") === !!S.ui.picsVie));
+  const g = classerPics(S.ui.picsVie ? "" : debutPlage());
+  const val = (p) => p.mesure === "fc" ? `${Math.round(p.v)} bpm`
+    : p.mesure === "puissance" ? `${Math.round(p.v)} W${S.prof.poids ? ` · ${nf(p.v / S.prof.poids, 1)} W/kg` : ""}`
+    : p.sport === "Swim" ? `${mmss(p.v)} · ${mmss(p.v / (p.r / 100))}/100 m` : `${mmss(p.v)} · ${mmss(p.v / (p.r / 1000))}/km`;
+  const NOMS = { puissance: "Puissance", allure: "Allure", fc: "FC moyenne max" };
+  const html = ["Ride", "Run", "Swim"].flatMap((sp) => ["puissance", "allure", "fc"].map((me) => {
+    const L = Object.entries(g).filter(([k]) => k.startsWith(sp + "|" + me + "|"));
+    if (!L.length) return "";
+    return `<h4>${SPORTS[sp].nom} · ${NOMS[me]}</h4><table class="pics"><tbody>${L.map(([k, ps]) => `<tr><th>${esc(k.split("|")[2])}</th>${ps.slice(0, 3).map((p, i) =>
+      `<td title="${esc(S.acts.find((a) => String(a.id) === p.id)?.nom || "")}">${["🥇", "🥈", "🥉"][i]} <b class="mono">${val(p)}</b> <span class="muted petit">${D.court(p.date)}${p.date.slice(0, 4) !== S.today.slice(0, 4) ? " " + p.date.slice(0, 4) : ""}</span></td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  })).join("");
+  el.innerHTML = html || '<p class="muted petit">Pas encore de performance de pointe sur la période.</p>';
+}
+
+const metJour = (j) => {
+  if (j > S.today) return "";
+  const so = S.sommeil.get(j), h = S.luna.get(j);
+  return so || h ? `<div class="j-met mono">${so ? "😴 " + nf(so / 60, 1) + " h" : ""}${so && h ? " · " : ""}${h ? "HRV " + nf(h) : ""}</div>` : "";
+};
+
+// Colonne « Résumé » de TrainingPeaks : forme en fin de semaine, sports fait / prévu, totaux
+function resumeSemaine(l) {
+  const t = S.today, fin = D.add(l, 6);
+  const A = S.acts.filter((a) => a.date >= l && a.date <= fin);
+  const E = S.evts.filter((e) => e.categorie === "WORKOUT" && e.date >= l && e.date <= fin);
+  const w = l <= t ? S.wellMap.get(fin < t ? fin : t) : null;
+  const pmc = w?.ctl != null ? `<div class="sr-pmc"><span><b style="color:${C.ctl}">${nf(w.ctl)}</b>Forme</span><span><b style="color:${C.atl}">${nf(w.atl)}</b>Fatigue</span><span><b style="color:${C.tsb}">${nf(w.ctl - w.atl)}</b>Fraîcheur</span></div>` : "";
+  const sp = ["Swim", "Ride", "Run"].map((f) => {
+    const fait = somme(A.filter((a) => fam(a.sport) === f).map((a) => a.duree_s)), prevu = somme(E.filter((e) => fam(e.sport) === f).map((e) => e.duree_s));
+    if (!fait && !prevu) return "";
+    const p = prevu ? Math.min(100, Math.round((fait / prevu) * 100)) : 100;
+    return `<div class="sr-sp"><span>${SPORTS[f].nom}</span><span class="mono">${fait ? dureeFmt(fait) : "0"}${prevu ? " / " + dureeFmt(prevu) : ""}</span><i style="--c:${SPORTS[f].c};--p:${p}%"></i></div>`;
+  }).join("");
+  const km = (f) => somme(A.filter((a) => fam(a.sport) === f).map((a) => a.distance_m));
+  const tot = [["Durée", somme(A.map((a) => a.duree_s)), heures], ["TSS", somme(A.map((a) => a.tss)), nf], ["Nat.", km("Swim"), (m) => nf(m) + " m"],
+    ["Vélo", km("Ride"), dist], ["Course", km("Run"), dist], ["D+", somme(A.map((a) => a.denivele_m)), (m) => nf(m) + " m"], ["Travail", somme(A.map((a) => a.kj)), (k) => nf(k) + " kJ"]]
+    .filter(([, v]) => v > 0).map(([n, v, f]) => `<span>${n} <b>${f(v)}</b></span>`).join("");
+  return pmc || sp || tot ? `<div class="sem-resume">${pmc}${sp}${tot ? `<div class="sr-tot mono">${tot}</div>` : ""}</div>` : "";
 }
 
 function rendrePlan() {
@@ -2490,13 +2590,13 @@ function rendrePlan() {
     html += `<div class="semaine">
       <div class="sem-tete"><span class="mono-lab fort">${titre}</span><span class="muted">${D.court(l)} – ${D.court(D.add(l, 6))}</span>${ph ? `<span class="tag-ph">${ph}</span>` : ""}
         <span class="sem-tot mono">TOTAL <b>${heures(somme(Object.values(tot)))}</b>${Object.keys(tot).filter((k) => tot[k]).map((k) => ` ${SPORTS[k].nom.toLowerCase()} <b>${heures(tot[k])}</b>`).join("")}</span></div>
-      <div class="jours ${S.ui.planMode === "month" ? "compact" : ""}">${J.map((j) => {
+      <div class="sem-corps"><div class="jours ${S.ui.planMode === "month" ? "compact" : ""}">${J.map((j) => {
         const it = pairer(j), cj = coursesDu(j);
         return `<div class="jour ${j === t ? "auj" : ""} ${j < t ? "passe" : ""}" data-jour="${j}">
           <div class="j-tete"><span class="mono">${D.fmt(j, { weekday: "short" }).replace(".", "").toUpperCase()}</span> <b>${D.fmt(j, { day: "numeric" })}</b>${MOBILE ? ` <span class="muted">${D.fmt(j, { month: "short" })}</span>` : ""}${j === t ? '<span class="tag-l">AUJ.</span>' : ""}</div>
-          <div class="j-seances">${cj.map((c) => `<div class="seance s-course p-${c.priorite}"><div class="s-tete"><span class="s-sport">COURSE ${c.priorite}</span></div><div class="s-nom"><b>${esc(c.nom)}</b></div><div class="s-p">${esc(c.sport || "")}${c.distance ? " · " + esc(c.distance) : ""}</div></div>`).join("")}${it.length ? it.map((x) => carteSeance(x, j)).join("") : cj.length ? "" : '<div class="vide">—</div>'}</div>
+          <div class="j-seances">${metJour(j)}${cj.map((c) => `<div class="seance s-course p-${c.priorite}"><div class="s-tete"><span class="s-sport">COURSE ${c.priorite}</span></div><div class="s-nom"><b>${esc(c.nom)}</b></div><div class="s-p">${esc(c.sport || "")}${c.distance ? " · " + esc(c.distance) : ""}</div></div>`).join("")}${it.length ? it.map((x) => carteSeance(x, j)).join("") : cj.length ? "" : '<div class="vide">—</div>'}</div>
         </div>`;
-      }).join("")}</div></div>`;
+      }).join("")}</div>${resumeSemaine(l)}</div></div>`;
   }
   el.innerHTML = html;
 }
@@ -2535,7 +2635,7 @@ async function charger() {
 const RENDUS = [rendreEntete, rendreKpis, rendreDecision, rendreReadiness, rendreDrapeau, rendreEquilibre, rendreZones, rendreJournal,
   rendreGlissant, rendrePmc, rendreVolume, rendreAllure, rendreEfficacite, rendreRepartition, rendreZonesRep, rendrePuissance,
   rendreBienEtre, rendreDeuxHrv, rendrePoids, rendreCourse, rendreArc, rendrePlan,
-  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel, rendreBriquesRessenti];
+  rendreRealisation, rendreCoach, rendreSeuils, rendrePredicteur, rendreNutrition, rendreCalculateur, rendreSaison, rendreLienTelegram, rendreMateriel, rendreBriquesRessenti, rendrePics];
 
 function toutRendre() {
   if (!S.d) return;
@@ -5008,6 +5108,8 @@ const montrerCarte = (c) => {
   if (recup) recup.prepend(carte("c-journal", "Habitudes et récupération", '<span class="muted petit">effet sur ta HRV du lendemain</span>'));
   const tests = $("#c-tests");
   if (tests) { const c = carte("c-records", "Records et seuils"); (tests.closest(".grille2") || tests).after(c); }
+  $("#c-power")?.closest(".carte")?.after(carte("c-pics", "Performances de pointe", '<div class="seg seg-mini"><button data-pics-vie="0">Période</button><button data-pics-vie="1">À vie</button></div>'));
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-pics-vie]"); if (b) { S.ui.picsVie = b.dataset.picsVie === "1"; rendrePics(); } });
   $("#c-pred")?.closest(".carte")?.after(carte("c-fiche", "Fiche de course", '<button type="button" class="btn" data-imprimer-fiche>Imprimer</button>'));
   // Chaleur : case à cocher dans la carte « Zones du jour » (indicatif, ne modifie rien)
   const z = $("#c-zones");
